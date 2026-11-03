@@ -10,13 +10,13 @@ const bootstrap = (
       contents: `
 import * as dialog from "@radix-ui/react-dialog";
 import * as react from "react";import * as jsx from "react/jsx-runtime";import {createRoot} from "react-dom/client";
-import {QueryClient,QueryClientProvider,useQueryClient} from "@tanstack/react-query";
+import {QueryClient,QueryClientProvider,useQueryClient,useQuery} from "@tanstack/react-query";
 const root=createRoot(document.getElementById("root")),client=new QueryClient(),dict={};
 const Icon = ({path,size}) => jsx.jsx("svg",{width:size,height:size,"aria-hidden":true,children:jsx.jsx("path",{d:path})});
 const Button = ({title,...props}) => jsx.jsx("button",{"data-tooltip":title,"aria-label":props["aria-label"] ?? title,...props});
 const DialogContent = ({header,footer,children}) => jsx.jsxs(dialog.Content,{children:[header,children,footer]});
 const Notice = ({children,error}) => jsx.jsx("p",{role:error?"alert":"status",children});
-window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
+window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient,useQuery},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
 window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
 window.openFixture=name=>{const entry=window.files.find(e=>e.name===name);root.render(jsx.jsx(QueryClientProvider,{client,children:jsx.jsx(window.mod.fileViewer.component,{entry,siblings:window.files,readOnly:name==="read.txt",open:e=>window.openFixture(e.name),close:()=>root.render("closed"),saved:()=>root.render("saved")},entry.path)}))};`,
       resolveDir: process.cwd(),
@@ -96,6 +96,10 @@ const srv = createServer(async (req, res) => {
     }
     if (url.pathname === "/api/v1/files/content") {
       const key = url.searchParams.get("target").replace("viewer:/", "");
+      if (url.searchParams.get("thumbnail") === "1") {
+        res.setHeader("Content-Type", "image/png");
+        return res.end(content["c.png"]);
+      }
       if (req.method === "PUT" && key.startsWith("viewer-image:")) {
         assert.equal(url.searchParams.get("replace_revision"), "a".repeat(64));
         const chunks = [];
@@ -157,6 +161,28 @@ try {
   await page.waitForFunction(
     () => document.querySelector(".vw-stage img")?.naturalWidth > 0,
   );
+  const strip = page.getByRole("navigation", { name: "Images in this folder" });
+  assert.equal(await strip.getByRole("button").count(), 3);
+  assert.equal(
+    await page.getByRole("button", { name: "Previous", exact: true }).count(),
+    0,
+  );
+  await page.waitForFunction(
+    () => document.querySelector(".vw-slides img")?.naturalWidth > 0,
+  );
+  await page.locator(".vw-next").click();
+  await page.getByRole("heading", { name: "b.svg" }).waitFor();
+  await strip.getByRole("button", { name: "c.png" }).click();
+  await page.getByRole("heading", { name: "c.png" }).waitFor();
+  assert.equal(await page.locator(".vw-next").count(), 0);
+  assert.equal(
+    await strip.locator('[aria-current="true"]').getAttribute("aria-label"),
+    "c.png",
+  );
+  await page.keyboard.press("ArrowLeft");
+  await page.getByRole("heading", { name: "b.svg" }).waitFor();
+  await page.locator(".vw-prev").click();
+  await page.getByRole("heading", { name: "a.webp" }).waitFor();
   await page.getByRole("button", { name: "Rotate right" }).click();
   assert.match(
     await page.locator(".vw-stage img").getAttribute("style"),
