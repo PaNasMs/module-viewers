@@ -18,7 +18,7 @@ const DialogContent = ({header,footer,children}) => jsx.jsxs(dialog.Content,{chi
 const Notice = ({children,error}) => jsx.jsx("p",{role:error?"alert":"status",children});
 window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient,useQuery},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
 window.pendingThumbs=()=>client.isFetching();
-window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","single.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
+window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","long.pdf","single.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
 window.openFixture=name=>{const entry=window.files.find(e=>e.name===name);root.render(jsx.jsx(QueryClientProvider,{client,children:jsx.jsx(window.mod.fileViewer.component,{entry,siblings:window.files,readOnly:name==="read.txt",open:e=>window.openFixture(e.name),close:()=>root.render("closed"),saved:()=>root.render("saved")},entry.path)}))};`,
       resolveDir: process.cwd(),
     },
@@ -43,35 +43,34 @@ const content = {
     "base64",
   ),
 };
-function pdf(single = false) {
-  let s = "%PDF-1.4\n",
-    offset = [0];
-  for (const obj of [
+function pdf(count) {
+  const kids = Array.from({ length: count }, (_, i) => 3 + i * 2 + " 0 R");
+  const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
-    single
-      ? "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"
-      : "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] >>",
-  ]) {
-    offset.push(s.length);
-    s += String(offset.length - 1) + " 0 obj\n" + obj + "\nendobj\n";
+    `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${count} >>`,
+  ];
+  for (let i = 0; i < count; i++) {
+    const paint = (i % 2 ? "0 0 1" : "1 0 0") + " rg 0 0 300 400 re f\n";
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Resources << >> /Contents ${4 + i * 2} 0 R >>`,
+      `<< /Length ${paint.length} >>\nstream\n${paint}endstream`,
+    );
   }
-  const x = s.length;
+  let result = "%PDF-1.4\n";
+  const offsets = objects.map((obj, i) => {
+    const offset = result.length;
+    result += i + 1 + " 0 obj\n" + obj + "\nendobj\n";
+    return String(offset).padStart(10, "0") + " 00000 n \n";
+  });
+  const start = result.length;
   return (
-    s +
-    "xref\n0 5\n0000000000 65535 f \n" +
-    offset
-      .slice(1)
-      .map((n) => String(n).padStart(10, "0") + " 00000 n \n")
-      .join("") +
-    "trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n" +
-    x +
-    "\n%%EOF"
+    result +
+    `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.join("")}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`
   );
 }
-content["sample.pdf"] = pdf();
-content["single.pdf"] = pdf(true);
+content["sample.pdf"] = pdf(2);
+content["single.pdf"] = pdf(1);
+content["long.pdf"] = pdf(40);
 let failedThumbReads = 0;
 let failSave = false,
   put = 0,
@@ -280,6 +279,59 @@ try {
         "Page 2" &&
       document.querySelector(".vw-doc")?.getAttribute("aria-busy") === "false",
   );
+  const pdfStrip = page.getByRole("navigation", { name: "Document pages" });
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(".vw-reader .vw-slides canvas:not([hidden])")
+        .length === 2,
+  );
+  assert.deepEqual(
+    await pdfStrip
+      .locator("canvas")
+      .evaluateAll((nodes) =>
+        nodes.map((c) =>
+          Array.from(c.getContext("2d").getImageData(4, 4, 1, 1).data),
+        ),
+      ),
+    [
+      [255, 0, 0, 255],
+      [0, 0, 255, 255],
+    ],
+  );
+  await pdfStrip.getByRole("button", { name: "Page 1", exact: true }).click();
+  await page.keyboard.press("ArrowRight");
+  assert.equal(
+    await pdfStrip.locator("[aria-current]").getAttribute("aria-label"),
+    "Page 2",
+  );
+  assert.equal(
+    await page.getByRole("button", { name: "Next", exact: true }).count(),
+    0,
+  );
+  await page.setViewportSize({ width: 320, height: 740 });
+  await open("long.pdf");
+  const jump = page.getByRole("spinbutton", { name: "Page", exact: true });
+  await jump.fill("37");
+  await jump.press("Enter");
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector(".vw-slides [aria-current]")
+        ?.getAttribute("aria-label") === "Page 37",
+  );
+  assert.ok((await pdfStrip.locator("canvas").count()) < 12);
+  const inside = await pdfStrip.locator("[aria-current]").evaluate((b) => {
+    const tile = b.getBoundingClientRect(),
+      rail = b.parentElement.getBoundingClientRect();
+    return tile.left >= rail.left && tile.right <= rail.right;
+  });
+  assert.ok(inside);
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  await page.setViewportSize({ width: 1280, height: 760 });
   await open("c.png");
   for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 760 });
@@ -307,6 +359,7 @@ try {
       document.querySelector(".vw-doc")?.getAttribute("aria-busy") === "false",
   );
   assert.equal(await page.getByRole("spinbutton").count(), 0);
+  assert.equal(await pdfStrip.count(), 0);
   assert.equal(
     await page.getByRole("button", { name: "Previous", exact: true }).count(),
     0,

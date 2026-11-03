@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@panasms/ui";
 import { mdiImageOutline } from "@mdi/js";
@@ -92,15 +98,59 @@ export function Filmstrip({
   restoreFocus: boolean;
   activeUrl: string;
 }) {
+  return (
+    <Carousel
+      count={group.length}
+      index={index}
+      label={t("gallery")}
+      restoreFocus={restoreFocus}
+      name={(n) => group[n].name}
+      choose={(n) => choose(group[n])}
+      preview={(n, visible) =>
+        n === index && activeUrl ? (
+          <img src={activeUrl} alt="" draggable={false} />
+        ) : (
+          visible && n !== index && <Preview entry={group[n]} />
+        )
+      }
+    />
+  );
+}
+
+export function Carousel({
+  count,
+  index,
+  label,
+  name,
+  choose,
+  preview,
+  counter,
+  restoreFocus = false,
+}: {
+  count: number;
+  index: number;
+  label: string;
+  name: (n: number) => string;
+  choose: (n: number) => void;
+  preview: (n: number, visible: boolean) => ReactNode;
+  counter?: ReactNode;
+  restoreFocus?: boolean;
+}) {
   const strip = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState<Set<number>>(() => new Set());
   useLayoutEffect(() => {
     const el = strip.current;
     const active = el?.children[index] as HTMLButtonElement | undefined;
     if (!el || !active) return;
-    el.scrollLeft =
-      active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2;
+    const center = () => {
+      el.scrollLeft =
+        active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2;
+    };
+    center();
     if (restoreFocus) active.focus({ preventScroll: true });
+    const observer = new ResizeObserver(center);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [index, restoreFocus]);
   useEffect(() => {
     const el = strip.current;
@@ -120,31 +170,29 @@ export function Filmstrip({
     );
     for (const child of Array.from(el.children)) observer.observe(child);
     return () => observer.disconnect();
-  }, [group]);
+  }, [count]);
   return (
-    <nav className="vw-filmstrip" aria-label={t("gallery")}>
-      <span className="vw-count">
-        {index + 1} / {group.length}
-      </span>
+    <nav className="vw-filmstrip" aria-label={label}>
+      {counter ?? (
+        <span className="vw-count">
+          {index + 1} / {count}
+        </span>
+      )}
       <div className="vw-slides" ref={strip}>
-        {group.map((file, n) => (
+        {Array.from({ length: count }, (_, n) => (
           <button
             type="button"
-            key={file.path}
+            key={n}
             data-index={n}
             aria-current={n === index ? "true" : undefined}
-            aria-label={file.name}
-            data-tooltip={file.name}
+            aria-label={name(n)}
+            data-tooltip={name(n)}
             tabIndex={n === index ? 0 : -1}
             onClick={() => {
-              if (n !== index) choose(file);
+              if (n !== index) choose(n);
             }}
           >
-            {n === index && activeUrl ? (
-              <img src={activeUrl} alt="" draggable={false} />
-            ) : (
-              visible.has(n) && n !== index && <Preview entry={file} />
-            )}
+            {preview(n, visible.has(n))}
           </button>
         ))}
       </div>
