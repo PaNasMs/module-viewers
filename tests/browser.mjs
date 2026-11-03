@@ -166,6 +166,7 @@ let browser;
 try {
   browser = await chromium.launch({
     executablePath: process.env.VIEWER_CHROME || undefined,
+    ignoreDefaultArgs: ["--hide-scrollbars"],
     args: ["--no-sandbox"],
   });
   const page = await browser.newPage();
@@ -271,6 +272,37 @@ try {
     () =>
       document.querySelector(".vw-doc")?.getAttribute("aria-busy") ===
         "false" && document.querySelector(".vw-doc canvas")?.height > 150,
+  );
+  // A classic scrollbar changes the scrollport without resizing the viewer.
+  const viewportChanges = await page
+    .locator(".vw-doc")
+    .evaluate(async (viewport) => {
+      const canvas = viewport.querySelector("canvas");
+      const before = viewport.clientWidth;
+      let redraws = 0;
+      const observer = new MutationObserver((records) => {
+        redraws += records.length;
+      });
+      observer.observe(canvas, {
+        attributes: true,
+        attributeFilter: ["width", "height"],
+      });
+      const frames = async () => {
+        for (let i = 0; i < 8; i++) await new Promise(requestAnimationFrame);
+      };
+      viewport.style.scrollbarGutter = "stable both-edges";
+      await frames();
+      const narrower = viewport.clientWidth;
+      viewport.style.scrollbarGutter = "";
+      await frames();
+      observer.disconnect();
+      return { before, narrower, redraws };
+    });
+  assert.ok(viewportChanges.narrower < viewportChanges.before);
+  assert.equal(
+    viewportChanges.redraws,
+    0,
+    "scrollbars must not restart PDF rendering",
   );
   await page.getByRole("button", { name: /Next/ }).click();
   await page.waitForFunction(
