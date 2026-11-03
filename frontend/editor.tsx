@@ -8,7 +8,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import type { Editor as Rich } from "@tiptap/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { locale } from "@panasms/i18n";
-import { content } from "./io";
+import { content, writeFile } from "./io";
 import { t } from "./strings";
 import { ext, type Props } from "./types";
 import { parsers, beautify } from "./format";
@@ -224,11 +224,10 @@ export default function Editor(
     try {
       const data = bytes();
       if (data.size > 4 * 1048576) throw Error(t("limit"));
-      const r = await fetch(
+      await writeFile(
         content(entry) + "&replace_revision=" + encodeURIComponent(revision!),
-        { method: "PUT", body: data, headers: { "X-PaNasMs-Request": "1" } },
+        data,
       );
-      if (r.status !== 204) throw Error(t("conflict"));
       draftMap.delete(entry.path);
       window.dispatchEvent(
         new CustomEvent("panasms:toast", { detail: t("saved") }),

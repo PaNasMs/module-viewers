@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ext, type Props } from "./types";
+import { writeFile } from "./io";
 import { t } from "./strings";
 function isStatic(bytes: Uint8Array, format: string) {
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
@@ -127,13 +128,11 @@ export function ImageSave({
           : entry.path.slice(0, entry.path.lastIndexOf("/") + 1) + copyName;
       const params = new URLSearchParams({ target });
       if (mode === "replace") params.set("replace_revision", entry.revision!);
-      const res = await fetch("/api/v1/files/content?" + params, {
-        method: "PUT",
-        headers: { "X-PaNasMs-Request": "1" },
-        body: result,
-      });
-      if (res.status !== 204)
-        throw Error(t(mode === "replace" ? "conflict" : "copyFail"));
+      await writeFile(
+        "/api/v1/files/content?" + params,
+        result,
+        mode === "replace" ? "conflict" : "copyFail",
+      );
       window.dispatchEvent(
         new CustomEvent("panasms:toast", { detail: t("saved") }),
       );

@@ -65,6 +65,7 @@ function pdf() {
 content["sample.pdf"] = pdf();
 let failSave = false,
   put = 0,
+  lostReplies = 0,
   bytes = "",
   savedImage;
 content["c.png"] = Buffer.from(
@@ -99,12 +100,17 @@ const srv = createServer(async (req, res) => {
         return res.end();
       }
       if (req.method === "PUT") {
-        put++;
+        if (failSave === "lost") lostReplies++;
+        else put++;
         assert.equal(req.headers["x-panasms-request"], "1");
         assert.equal(url.searchParams.get("replace_revision"), "a".repeat(64));
         const chunks = [];
         for await (const c of req) chunks.push(c);
         bytes = Buffer.concat(chunks).toString();
+        if (failSave === "lost") {
+          req.socket.destroy();
+          return;
+        }
         res.statusCode = failSave ? 409 : 204;
         return res.end();
       }
@@ -176,6 +182,11 @@ try {
   await page.getByRole("alert").waitFor();
   await page.getByRole("button", { name: "Back to folder" }).click();
   await page.getByRole("button", { name: "Keep editing" }).click();
+  failSave = "lost";
+  await page.keyboard.press("Control+s");
+  await page.getByText(/Save not confirmed/).waitFor();
+  await page.waitForFunction(() => !document.querySelector(".vw-code")?.inert);
+  assert.match(await page.locator(".cm-content").innerText(), /edited/);
   failSave = false;
   await page.keyboard.press("Control+s");
   await page.getByText("saved", { exact: true }).waitFor();
@@ -207,6 +218,7 @@ try {
       document.querySelector(".vw-doc")?.getAttribute("aria-busy") === "false",
   );
   assert.equal(put, 6);
+  assert.ok(lostReplies >= 1);
   console.log(
     "Gallery, code formatters, Markdown/HTML visual editing, conflict recovery, read-only files and two PDF pages passed.",
   );

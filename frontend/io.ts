@@ -44,3 +44,16 @@ export async function decode(
     pages: Number(r.headers.get("X-Page-Count")) || 1,
   };
 }
+
+export async function writeFile(
+  url: string,
+  body: Blob,
+  reason: "conflict" | "copyFail" = "conflict",
+) {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "X-PaNasMs-Request": "1" },
+    body,
+  }).catch(() => null);
+  if (res?.status !== 204) throw Error(t(reason));
+}
