@@ -1,3 +1,5 @@
+import { Icon, Button } from "@panasms/ui";
+import { mdiArrowLeft, mdiDownloadOutline } from "@mdi/js";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { content, read } from "./io";
 import { kind, type Props } from "./types";
@@ -31,18 +33,29 @@ export default function Workspace(p: Props) {
   }, [entry, k, retry]);
   return (
     <section className="vw panel">
-      <header>
-        <button
+      <header className="vw-header">
+        <Button
+          className="vw-header-action"
+          title={t("back")}
+          aria-label={t("back")}
           type="button"
           onClick={() => {
             if (!guard.current || guard.current()) p.close();
           }}
         >
-          ‹ {t("back")}
-        </button>
+          <Icon path={mdiArrowLeft} size={20} />
+          <span>{t("folder")}</span>
+        </Button>
         <h1>{entry.name}</h1>
-        <a href={content(entry)} download={entry.name}>
-          {t("download")}
+        <a
+          className="button vw-header-action"
+          data-tooltip={t("download")}
+          aria-label={t("download")}
+          href={content(entry)}
+          download={entry.name}
+        >
+          <Icon path={mdiDownloadOutline} size={20} />
+          <span>{t("get")}</span>
         </a>
       </header>
       {error ? (

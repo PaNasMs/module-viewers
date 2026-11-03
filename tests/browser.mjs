@@ -8,10 +8,15 @@ const bootstrap = (
   await build({
     stdin: {
       contents: `
+import * as dialog from "@radix-ui/react-dialog";
 import * as react from "react";import * as jsx from "react/jsx-runtime";import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider,useQueryClient} from "@tanstack/react-query";
 const root=createRoot(document.getElementById("root")),client=new QueryClient(),dict={};
-window.PaNasMsSDK={react,jsx,query:{useQueryClient},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
+const Icon = ({path,size}) => jsx.jsx("svg",{width:size,height:size,"aria-hidden":true,children:jsx.jsx("path",{d:path})});
+const Button = ({title,...props}) => jsx.jsx("button",{"data-tooltip":title,"aria-label":props["aria-label"] ?? title,...props});
+const DialogContent = ({header,footer,children}) => jsx.jsxs(dialog.Content,{children:[header,children,footer]});
+const Notice = ({children,error}) => jsx.jsx("p",{role:error?"alert":"status",children});
+window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
 window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
 window.openFixture=name=>{const entry=window.files.find(e=>e.name===name);root.render(jsx.jsx(QueryClientProvider,{client,children:jsx.jsx(window.mod.fileViewer.component,{entry,siblings:window.files,readOnly:name==="read.txt",open:e=>window.openFixture(e.name),close:()=>root.render("closed"),saved:()=>root.render("saved")},entry.path)}))};`,
       resolveDir: process.cwd(),
@@ -82,7 +87,7 @@ const srv = createServer(async (req, res) => {
       );
       res.setHeader("Content-Type", "text/html");
       return res.end(
-        '<main id="root"></main><script src="/host.js"></script><script src="/api/v1/module-assets/viewers/index.js"></script>',
+        '<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/api/v1/module-assets/viewers/index.css"><main id="root"></main><script src="/host.js"></script><script src="/api/v1/module-assets/viewers/index.js"></script>',
       );
     }
     if (url.pathname === "/host.js") {
@@ -123,7 +128,9 @@ const srv = createServer(async (req, res) => {
       "Content-Type",
       [".js", ".mjs"].includes(extname(f))
         ? "application/javascript"
-        : "application/octet-stream",
+        : extname(f) === ".css"
+          ? "text/css"
+          : "application/octet-stream",
     );
     res.end(await readFile(f));
   } catch {
@@ -156,10 +163,17 @@ try {
     /90deg/,
   );
   await page.keyboard.press("ArrowRight");
+  assert.equal(
+    await page.locator(":focus").getAttribute("data-tooltip"),
+    "Monochrome",
+  );
+  await page.locator(".vw-stage").focus();
+  await page.keyboard.press("ArrowRight");
   await page.getByRole("heading", { name: "b.svg" }).waitFor();
   await open("c.png");
   await page.getByRole("button", { name: "Rotate right" }).click();
   await page.getByRole("button", { name: "Save image…" }).click();
+  await page.getByRole("combobox", { name: "Save as" }).selectOption("replace");
   await page.getByRole("button", { name: "Replace original" }).click();
   await page.getByText("saved", { exact: true }).waitFor();
   assert.equal(savedImage.readUInt32BE(16), 3);
@@ -217,6 +231,27 @@ try {
         "Page 2" &&
       document.querySelector(".vw-doc")?.getAttribute("aria-busy") === "false",
   );
+  await open("c.png");
+  for (const width of [320, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 760 });
+    const menu = page.getByRole("combobox", { name: "Tools" });
+    assert.equal(await menu.isVisible(), width < 640);
+    assert.ok(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+    if (width < 640) {
+      await menu.selectOption({ label: "Rotate right" });
+      await menu.selectOption({ label: "Save image…" });
+      assert.equal(
+        await page.getByRole("combobox", { name: "Save as" }).inputValue(),
+        "copy",
+      );
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+    }
+  }
   assert.equal(put, 6);
   assert.ok(lostReplies >= 1);
   console.log(

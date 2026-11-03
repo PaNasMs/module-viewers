@@ -1,3 +1,18 @@
+import { Toolbar } from "./toolbar";
+import {
+  mdiChevronLeft,
+  mdiChevronRight,
+  mdiMagnifyMinusOutline,
+  mdiMagnifyPlusOutline,
+  mdiFitToScreenOutline,
+  mdiImageSizeSelectActual,
+  mdiRotateLeft,
+  mdiRotateRight,
+  mdiCircleHalfFull,
+  mdiRestore,
+  mdiFullscreen,
+  mdiContentSaveOutline,
+} from "@mdi/js";
 import { useEffect, useRef, useState } from "react";
 import { converts, ext, kind, natives, type Props } from "./types";
 import { decode } from "./io";
@@ -76,6 +91,8 @@ export function ImageView({
     const key = (e: KeyboardEvent) => {
       if (
         savePanel ||
+        (e.target instanceof Element &&
+          !!e.target.closest("select, input, [role=dialog]")) ||
         e.altKey ||
         e.ctrlKey ||
         e.metaKey ||
@@ -93,86 +110,122 @@ export function ImageView({
   });
   return (
     <>
-      <div className="vw-tools" inert={savePanel}>
-        <button disabled={!loaded || !!err} onClick={() => saveOpen(true)}>
-          {t("imageSave")}
-        </button>
-        <button disabled={i <= 0} onClick={() => step(-1)}>
-          ‹ {t("prev")}
-        </button>
-        <span>
-          {i + 1} / {group.length}
-        </span>
-        <button disabled={i >= group.length - 1} onClick={() => step(1)}>
-          {t("next")} ›
-        </button>
-        <button
-          onClick={() => {
-            T(turn - 1);
-            O([0, 0]);
-          }}
-        >
-          ↶ {t("left")}
-        </button>
-        <button
-          onClick={() => {
-            T(turn + 1);
-            O([0, 0]);
-          }}
-        >
-          ↷ {t("right")}
-        </button>
-        <button
-          aria-label={t("zoomOut")}
-          title={t("zoomOut")}
-          onClick={() => adjust(scale / 1.3)}
-        >
-          −
-        </button>
-        <output>{Math.round(scale * 100)}%</output>
-        <button
-          aria-label={t("zoomIn")}
-          title={t("zoomIn")}
-          onClick={() => adjust(scale * 1.3)}
-        >
-          +
-        </button>
-        <button onClick={reset}>{t("fit")}</button>
-        <button
-          onClick={() => {
-            Z(1);
-            O([0, 0]);
-          }}
-        >
-          1:1
-        </button>
-        <button aria-pressed={mono} onClick={() => M(!mono)}>
-          {t("mono")}
-        </button>
-        <button
-          onClick={() => {
-            T(0);
-            M(false);
-            reset();
-          }}
-        >
-          {t("reset")}
-        </button>
-        {document.fullscreenEnabled && (
-          <button
-            onClick={() => {
-              const el = frame.current?.closest("section");
-              void (
-                document.fullscreenElement
-                  ? document.exitFullscreen()
-                  : el?.requestFullscreen()
-              )?.catch(() => E(t("error")));
-            }}
-          >
-            {t("full")}
-          </button>
-        )}
-      </div>
+      <Toolbar
+        groups={[
+          {
+            primary: true,
+            between: (
+              <span className="vw-count">
+                {i + 1} / {group.length}
+              </span>
+            ),
+            commands: [
+              {
+                label: t("prev"),
+                icon: mdiChevronLeft,
+                disabled: i <= 0,
+                run: () => step(-1),
+              },
+              {
+                label: t("next"),
+                icon: mdiChevronRight,
+                disabled: i >= group.length - 1,
+                run: () => step(1),
+              },
+            ],
+          },
+          {
+            between: <output>{Math.round(scale * 100)}%</output>,
+            commands: [
+              {
+                label: t("zoomOut"),
+                icon: mdiMagnifyMinusOutline,
+                run: () => adjust(scale / 1.3),
+              },
+              {
+                label: t("zoomIn"),
+                icon: mdiMagnifyPlusOutline,
+                run: () => adjust(scale * 1.3),
+              },
+              {
+                label: t("fit"),
+                icon: mdiFitToScreenOutline,
+                pressed: zoom === null,
+                run: reset,
+              },
+              {
+                label: t("actual"),
+                icon: mdiImageSizeSelectActual,
+                run: () => {
+                  Z(1);
+                  O([0, 0]);
+                },
+              },
+            ],
+          },
+          {
+            commands: [
+              {
+                label: t("left"),
+                icon: mdiRotateLeft,
+                run: () => {
+                  T(turn - 1);
+                  O([0, 0]);
+                },
+              },
+              {
+                label: t("right"),
+                icon: mdiRotateRight,
+                run: () => {
+                  T(turn + 1);
+                  O([0, 0]);
+                },
+              },
+              {
+                label: t("mono"),
+                icon: mdiCircleHalfFull,
+                pressed: mono,
+                run: () => M(!mono),
+              },
+              {
+                label: t("reset"),
+                icon: mdiRestore,
+                run: () => {
+                  T(0);
+                  M(false);
+                  reset();
+                },
+              },
+            ],
+          },
+          {
+            commands: [
+              ...(document.fullscreenEnabled
+                ? [
+                    {
+                      label: t("full"),
+                      icon: mdiFullscreen,
+                      run: () => {
+                        const el = frame.current?.closest("section");
+                        void (
+                          document.fullscreenElement
+                            ? document.exitFullscreen()
+                            : el?.requestFullscreen()
+                        )?.catch(() => E(t("error")));
+                      },
+                    },
+                  ]
+                : []),
+              {
+                label: t("imageSave"),
+                icon: mdiContentSaveOutline,
+                disabled: !loaded || !!err,
+                run: () => saveOpen(true),
+              },
+            ],
+          },
+        ]}
+      />
       {savePanel && frame.current?.querySelector("img") && (
         <ImageSave
           entry={entry}
