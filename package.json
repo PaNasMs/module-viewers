@@ -1,7 +1,7 @@
 {
   "name": "@panasms/module-viewers",
   "private": true,
-  "version": "0.1.6",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "build": "tsc && node scripts/build.mjs"
@@ -20,6 +20,7 @@
     "@tiptap/core": "3.32.2",
     "@tiptap/markdown": "3.32.2",
     "@tiptap/starter-kit": "3.32.2",
+    "@zip.js/zip.js": "2.24.0",
     "codemirror": "6.0.2",
     "esbuild": "0.28.2",
     "marked": "18.1.3",

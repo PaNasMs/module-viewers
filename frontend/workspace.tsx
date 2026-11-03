@@ -6,6 +6,7 @@ import { kind, type Props } from "./types";
 import { t } from "./strings";
 import { ImageView } from "./image";
 const Editor = lazy(() => import("./editor"));
+const Office = lazy(() => import("./office"));
 const Documents = lazy(() => import("./documents"));
 export default function Workspace(p: Props) {
   const [entry] = useState(p.entry),
@@ -18,11 +19,7 @@ export default function Workspace(p: Props) {
     const c = new AbortController();
     E("");
     B(undefined);
-    read(
-      entry,
-      (k === "text" ? 4 : k === "djvu" || k === "image" ? 48 : 96) * 1048576,
-      c.signal,
-    )
+    read(entry, (k === "text" ? 4 : k === "pdf" ? 96 : 48) * 1048576, c.signal)
       .then((b) => {
         if (!c.signal.aborted) B(b);
       })
@@ -76,6 +73,8 @@ export default function Workspace(p: Props) {
         <Suspense fallback={<p role="status">{t("loading")}</p>}>
           {k === "text" ? (
             <Editor {...p} entry={entry} blob={blob} guard={guard} />
+          ) : k === "docx" || k === "xlsx" || k === "pptx" ? (
+            <Office {...p} entry={entry} blob={blob} format={k} guard={guard} />
           ) : (
             <Documents blob={blob} kind={k} />
           )}

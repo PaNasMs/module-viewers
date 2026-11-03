@@ -17,9 +17,11 @@ import { t } from "./strings";
 export default function Documents({
   blob,
   kind,
+  slides = false,
 }: {
   blob: Blob;
   kind: string;
+  slides?: boolean;
 }) {
   const [page, P] = useState(1),
     [pages, N] = useState(0),
@@ -150,7 +152,7 @@ export default function Documents({
     <label className="vw-count vw-page-number">
       <input
         key={page}
-        aria-label={t("page")}
+        aria-label={t(slides ? "slide" : "page")}
         type="number"
         min={1}
         max={pages || 1}
@@ -250,7 +252,9 @@ export default function Documents({
           ref={area}
           aria-busy={busy}
           tabIndex={album ? 0 : undefined}
-          aria-label={album ? t("page") + " " + page : undefined}
+          aria-label={
+            album ? t(slides ? "slide" : "page") + " " + page : undefined
+          }
           onTouchStart={(e) => {
             const touch = e.touches[0];
             gesture.current =
@@ -288,13 +292,16 @@ export default function Documents({
             </p>
           )}
           {kind === "pdf" ? (
-            <canvas aria-label={t("page") + " " + page} ref={canvas} />
+            <canvas
+              aria-label={t(slides ? "slide" : "page") + " " + page}
+              ref={canvas}
+            />
           ) : (
             image &&
             !busy &&
             !error && (
               <img
-                alt={t("page") + " " + page}
+                alt={t(slides ? "slide" : "page") + " " + page}
                 src={image}
                 style={{ width: width * scale }}
               />
@@ -329,9 +336,9 @@ export default function Documents({
         <Carousel
           count={pages}
           index={page - 1}
-          label={t("pageStrip")}
+          label={t(slides ? "slideStrip" : "pageStrip")}
           counter={pageNumber}
-          name={(n) => t("page") + " " + (n + 1)}
+          name={(n) => t(slides ? "slide" : "page") + " " + (n + 1)}
           restoreFocus={stripFocus}
           choose={(n) => {
             setStripFocus(true);

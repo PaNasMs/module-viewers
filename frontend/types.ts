@@ -42,6 +42,7 @@ const text = new Set(
 export function kind(name: string) {
   const x = ext(name);
   if (Object.hasOwn(natives, x) || converts.has(x)) return "image";
+  if (x === "docx" || x === "xlsx" || x === "pptx") return x;
   if (x === "pdf") return "pdf";
   if (x === "djvu" || x === "djv") return "djvu";
   if (

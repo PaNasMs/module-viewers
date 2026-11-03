@@ -1,8 +1,8 @@
 {
   "id": "viewers",
   "title": "Viewers and editors",
-  "description": "Open photos, edit text and code, and read PDF and DjVu documents from Files.",
-  "version": "0.1.6",
+  "description": "Browse photos, edit text, DOCX and XLSX, and read PDF, DjVu and PowerPoint slides from Files.",
+  "version": "0.2.0",
   "api": 1,
   "core": ">=0.2.27,<0.3.0",
   "architecture": "arm64",
@@ -17,21 +17,24 @@
     "djvulibre-bin": "3.5",
     "bubblewrap": "0.8",
     "imagemagick": "6",
-    "util-linux": "2.38"
+    "util-linux": "2.38",
+    "libreoffice-impress": "7.4",
+    "libreoffice-writer": "7.4",
+    "fonts-liberation": "1.07"
   },
   "license": "SUL-1.0",
   "translations": {
     "ru": {
       "title": "Просмотрщики и редакторы",
-      "description": "Просмотр изображений, PDF и DjVu, редактирование текста и кода из модуля «Файлы»."
+      "description": "Просмотр фото, PDF, DjVu и слайдов PowerPoint, редактирование текста, DOCX и XLSX из «Файлов»."
     },
     "uk": {
       "title": "Переглядачі та редактори",
-      "description": "Перегляд зображень, PDF і DjVu, редагування тексту та коду з модуля «Файли»."
+      "description": "Перегляд фото, PDF, DjVu та слайдів PowerPoint, редагування тексту, DOCX і XLSX із «Файлів»."
     },
     "en": {
       "title": "Viewers and editors",
-      "description": "Open photos, edit text and code, and read PDF and DjVu documents from Files."
+      "description": "Browse photos, edit text, DOCX and XLSX, and read PDF, DjVu and PowerPoint slides from Files."
     }
   }
 }

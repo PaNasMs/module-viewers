@@ -39,6 +39,12 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node tests/browser.mjs
+      - name: Render Office documents in the production sandbox
+        if: matrix.arch == 'amd64'
+        run: |
+          sudo apt-get install -y --no-install-recommends bubblewrap util-linux fonts-liberation libreoffice-impress libreoffice-writer
+          go test -c -o "$RUNNER_TEMP/office-test" ./cmd/server
+          sudo env VIEWER_OFFICE_FIXTURES="$PWD/tests/fixtures" "$RUNNER_TEMP/office-test" -test.run TestOfficeConversion
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: module-payload-${{ matrix.arch }}

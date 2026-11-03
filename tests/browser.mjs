@@ -1,3 +1,4 @@
+import { ZipReader, Uint8ArrayReader, TextWriter } from "@zip.js/zip.js";
 import { build } from "esbuild";
 import { chromium } from "@playwright/test";
 import { createServer } from "node:http";
@@ -18,7 +19,7 @@ const DialogContent = ({header,footer,children}) => jsx.jsxs(dialog.Content,{chi
 const Notice = ({children,error}) => jsx.jsx("p",{role:error?"alert":"status",children});
 window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient,useQuery},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
 window.pendingThumbs=()=>client.isFetching();
-window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","long.pdf","single.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
+window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","long.pdf","single.pdf","sample.djvu","read.txt","Sample.docx","Complex.docx","Sample.xlsx","Slides.pptx"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
 window.openFixture=name=>{const entry=window.files.find(e=>e.name===name);root.render(jsx.jsx(QueryClientProvider,{client,children:jsx.jsx(window.mod.fileViewer.component,{entry,siblings:window.files,readOnly:name==="read.txt",open:e=>window.openFixture(e.name),close:()=>root.render("closed"),saved:()=>root.render("saved")},entry.path)}))};`,
       resolveDir: process.cwd(),
     },
@@ -71,6 +72,14 @@ function pdf(count) {
 content["sample.pdf"] = pdf(2);
 content["single.pdf"] = pdf(1);
 content["long.pdf"] = pdf(40);
+const officeWrites = new Map();
+for (const name of [
+  "Sample.docx",
+  "Complex.docx",
+  "Sample.xlsx",
+  "Slides.pptx",
+])
+  content[name] = await readFile("tests/fixtures/" + name);
 let failedThumbReads = 0;
 let failSave = false,
   put = 0,
@@ -98,6 +107,13 @@ const srv = createServer(async (req, res) => {
       res.setHeader("Content-Type", "application/javascript");
       return res.end(bootstrap);
     }
+    if (
+      url.pathname === "/api/v1/module-api/viewers/render" &&
+      ["docx", "pptx"].includes(url.searchParams.get("format"))
+    ) {
+      res.setHeader("Content-Type", "application/pdf");
+      return res.end(content["sample.pdf"]);
+    }
     if (url.pathname === "/api/v1/files/content") {
       const key = url.searchParams.get("target").replace("viewer:/", "");
       if (url.searchParams.get("thumbnail") === "1") {
@@ -124,6 +140,18 @@ const srv = createServer(async (req, res) => {
         const chunks = [];
         for await (const c of req) chunks.push(c);
         savedImage = Buffer.concat(chunks);
+        res.statusCode = 204;
+        return res.end();
+      }
+      if (req.method === "PUT" && /\.(docx|xlsx)$/.test(key)) {
+        assert.equal(url.searchParams.get("replace_revision"), "a".repeat(64));
+        const data = [];
+        for await (const chunk of req) data.push(chunk);
+        if (failSave) {
+          res.statusCode = 409;
+          return res.end();
+        }
+        officeWrites.set(key, Buffer.concat(data));
         res.statusCode = 204;
         return res.end();
       }
@@ -177,6 +205,83 @@ try {
     await page.evaluate((n) => window.openFixture(n), name);
     await page.getByRole("heading", { name, exact: true }).waitFor();
   };
+  await open("Sample.docx");
+  const rich = page.locator(".vw-word [contenteditable=true]");
+  await rich.locator("p").first().click();
+  await page.keyboard.press("Home");
+  await page.keyboard.type("Revised ");
+  await page.getByRole("button", { name: "Heading", exact: true }).click();
+  await rich.locator("h2").waitFor();
+  await rich.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Bullet list", exact: true }).click();
+  await page.getByRole("button", { name: "Italic", exact: true }).click();
+  await rich.locator("li").waitFor();
+  await page.waitForFunction(() =>
+    document.activeElement?.matches(".vw-word .tiptap"),
+  );
+  await page.keyboard.type("New item");
+  failSave = true;
+  await page.keyboard.press("Control+s");
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Save not confirmed" })
+    .waitFor();
+  assert.match(await rich.innerText(), /New item/);
+  assert.equal(officeWrites.size, 0);
+  failSave = false;
+  await page.keyboard.press("Control+s");
+  await page.getByText("saved", { exact: true }).waitFor();
+  const output = async (name) => {
+    const zip = new ZipReader(new Uint8ArrayReader(officeWrites.get(name)));
+    const parts = new Map(
+      (await zip.getEntries())
+        .filter((e) => !e.directory)
+        .map((e) => [e.filename, e]),
+    );
+    return async (path) =>
+      parts.get(path).getData(new TextWriter(), { checkSignature: true });
+  };
+  const savedWord = await output("Sample.docx");
+  assert.match(await savedWord("word/document.xml"), /Heading2/);
+  assert.match(await savedWord("word/document.xml"), /Revised/);
+  assert.match(await savedWord("word/document.xml"), /884411/);
+  assert.match(await savedWord("word/header1.xml"), /Test header/);
+  assert.match(await savedWord("word/document.xml"), /<w:i[\s/>]/);
+  assert.match(await savedWord("word/styles.xml"), /Heading2/);
+  assert.match(await savedWord("word/numbering.xml"), /bullet/);
+  assert.match(
+    await savedWord("word/_rels/document.xml.rels"),
+    /numbering.xml/,
+  );
+  assert.match(await savedWord("word/_rels/document.xml.rels"), /styles.xml/);
+  await open("Sample.xlsx");
+  await page.getByRole("textbox", { name: "A1", exact: true }).fill("35");
+  assert.equal(
+    await page
+      .getByRole("textbox", { name: "B1", exact: true })
+      .getAttribute("readonly"),
+    "",
+  );
+  await page
+    .getByRole("combobox", { name: "Sheet", exact: true })
+    .selectOption({ label: "Notes" });
+  await page.getByRole("textbox", { name: "A2", exact: true }).fill("note");
+  await page.keyboard.press("Control+s");
+  await page.getByText("saved", { exact: true }).waitFor();
+  const savedBook = await output("Sample.xlsx");
+  assert.match(await savedBook("xl/worksheets/sheet1.xml"), /<v>35<\/v>/);
+  assert.match(await savedBook("xl/worksheets/sheet1.xml"), /<f>A1\*2<\/f>/);
+  assert.match(await savedBook("xl/worksheets/sheet2.xml"), /note/);
+  await open("Complex.docx");
+  await page.getByText(/opened for reading/i).waitFor();
+  await page.locator(".vw-doc canvas").waitFor();
+  await open("Slides.pptx");
+  await page
+    .getByRole("navigation", { name: "Slides" })
+    .getByRole("button", { name: "Slide 2", exact: true })
+    .click();
+  await page.locator('.vw-doc[aria-label="Slide 2"] canvas').waitFor();
   await open("a.webp");
   await page.waitForFunction(
     () => document.querySelector(".vw-stage img")?.naturalWidth > 0,

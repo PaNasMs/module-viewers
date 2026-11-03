@@ -9,6 +9,7 @@ type Command = {
   run: () => void;
   disabled?: boolean;
   pressed?: boolean;
+  keepSelection?: boolean;
 };
 type Group = { commands: Command[]; between?: ReactNode; primary?: boolean };
 
@@ -65,6 +66,11 @@ export function Toolbar({ groups }: { groups: Group[] }) {
                   title={command.label}
                   aria-pressed={command.pressed}
                   disabled={command.disabled}
+                  onMouseDown={
+                    command.keepSelection
+                      ? (event) => event.preventDefault()
+                      : undefined
+                  }
                   onClick={command.run}
                 >
                   <Icon path={command.icon} size={20} />
