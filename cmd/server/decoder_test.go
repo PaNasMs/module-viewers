@@ -25,3 +25,21 @@ func TestInstalledDecoders(t *testing.T) {
 		}
 	}
 }
+
+func TestOfficeConversion(t *testing.T) {
+	base := os.Getenv("VIEWER_OFFICE_FIXTURES")
+	if base == "" {
+		t.Skip("requires LibreOffice and mount namespaces")
+	}
+	for _, tc := range []struct{ name, format string }{{"Slides.pptx", "pptx"}, {"Complex.docx", "docx"}} {
+		data, err := os.ReadFile(base + "/" + tc.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w := httptest.NewRecorder()
+		render(w, httptest.NewRequest("POST", "/render?format="+tc.format+"&page=1", bytes.NewReader(data)))
+		if w.Code != 200 || w.Header().Get("Content-Type") != "application/pdf" || !bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF-")) {
+			t.Fatalf("%s: %d %s", tc.name, w.Code, w.Body.String())
+		}
+	}
+}

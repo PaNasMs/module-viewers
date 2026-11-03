@@ -429,3 +429,85 @@
   line-height: 1rem;
   color: var(--ink);
 }
+.vw-word {
+  padding: var(--space-4);
+  background: var(--inset);
+}
+.vw-word .tiptap {
+  max-width: 52rem;
+  min-height: 50vh;
+  margin: auto;
+  padding: clamp(1rem, 4vw, 3rem);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.vw-workbook {
+  min-width: 0;
+}
+.vw-sheet-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+.vw-sheet-nav label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.vw-sheet-nav input {
+  width: 8ch;
+}
+.vw-sheet-nav select {
+  max-width: 20ch;
+}
+.vw-sheet-nav .vw-tools {
+  background: transparent;
+  padding: 0;
+}
+.vw-grid-wrap {
+  overflow: auto;
+  max-height: 65vh;
+}
+.vw-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.vw-grid th,
+.vw-grid td {
+  border-bottom: 1px solid var(--line);
+  border-inline-end: 1px solid var(--line);
+  padding: 0;
+}
+.vw-grid th {
+  padding: var(--space-1) var(--space-2);
+  background: var(--inset);
+  color: var(--mute);
+}
+.vw-grid thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.vw-grid input {
+  width: 100%;
+  min-width: 10ch;
+  border: 0;
+  border-radius: 0;
+  background: var(--panel);
+  color: var(--ink);
+  padding: var(--space-2);
+}
+.vw-grid input:read-only {
+  background: var(--inset);
+}
+.vw-grid input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.vw-workbook footer {
+  padding: var(--space-2) var(--space-4);
+}

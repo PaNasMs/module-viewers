@@ -57,9 +57,10 @@ func render(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	kind := r.URL.Query().Get("format")
+	office := kind == "docx" || kind == "pptx"
 	coder := formats[kind]
 	page, e := strconv.Atoi(r.URL.Query().Get("page"))
-	if e != nil || page < 1 || page > 100000 || (kind != "djvu" && coder == "") {
+	if e != nil || page < 1 || page > 100000 || (kind != "djvu" && !office && coder == "") {
 		http.Error(w, "Invalid format or page", 400)
 		return
 	}
@@ -70,7 +71,11 @@ func render(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Decoder busy", 429)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 22*time.Second)
+	timeout := 22 * time.Second
+	if office {
+		timeout = 55 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	dir, e := os.MkdirTemp("", "viewer-input-")
 	if e != nil {
@@ -95,6 +100,17 @@ func render(w http.ResponseWriter, r *http.Request) {
 	}
 	// The bind mount is read-only. The private parent directory stops other host users reading it.
 	var data []byte
+	if office {
+		data, e = officePDF(ctx, f.Name(), kind)
+		if e != nil {
+			http.Error(w, "Cannot render office document", 422)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Write(data)
+		return
+	}
 	if kind == "djvu" {
 		n, err := run(ctx, f.Name(), "/usr/bin/djvused", "/document", "-e", "n")
 		count, pe := strconv.Atoi(strings.TrimSpace(string(n)))
