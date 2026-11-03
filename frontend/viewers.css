@@ -1,0 +1,166 @@
+.vw {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: none;
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  gap: var(--space-3);
+}
+.vw header,
+.vw-tools,
+.vw footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.vw header h1 {
+  flex: 1 1 12rem;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: 1.35rem;
+}
+.vw button,
+.vw header a {
+  font: inherit;
+  color: var(--ink);
+  background: var(--inset);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  min-height: var(--control);
+  padding: 0.45em 0.9em;
+  cursor: pointer;
+  text-decoration: none;
+}
+.vw button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.vw button[aria-pressed="true"] {
+  background: var(--selection);
+  border-color: var(--focus);
+}
+.vw button:focus-visible,
+.vw a:focus-visible,
+.vw input:focus-visible,
+.vw-stage:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.vw-tools output,
+.vw-tools span,
+.vw footer {
+  font-variant-numeric: tabular-nums;
+  color: var(--mute);
+}
+.vw-tools input[type="number"] {
+  width: 5em;
+  min-height: 2.5rem;
+}
+.vw-stage,
+.vw-doc,
+.vw-rich,
+.vw-code {
+  height: clamp(18rem, 61dvh, 60rem);
+  border-radius: var(--radius-sm);
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+.vw-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--inset);
+  touch-action: none;
+  cursor: grab;
+}
+.vw-stage:active {
+  cursor: grabbing;
+}
+.vw-stage img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  pointer-events: none;
+}
+.vw:fullscreen {
+  height: 100%;
+  background: var(--panel-solid);
+}
+.vw:fullscreen .vw-stage {
+  flex: 1;
+}
+.vw-doc,
+.vw-rich {
+  overflow: auto;
+}
+.vw-doc canvas,
+.vw-doc img {
+  display: block;
+  margin: var(--space-2) auto;
+  max-width: none;
+}
+.vw-code {
+  overflow: hidden;
+}
+.vw .cm-editor {
+  height: 100%;
+}
+.vw .cm-scroller {
+  overflow: auto;
+}
+.vw .cm-content,
+.vw .cm-gutters {
+  font-family: ui-monospace, monospace;
+}
+.vw-rich .tiptap {
+  min-height: 100%;
+  padding: var(--space-4);
+  overflow-wrap: anywhere;
+}
+.vw-rich .tiptap ul {
+  list-style: disc inside;
+}
+.vw-rich .tiptap ol {
+  list-style: decimal inside;
+}
+.vw-rich .tiptap p,
+.vw-rich .tiptap h2 {
+  margin: 0.6em 0;
+}
+.vw-rich .tiptap h2 {
+  font-size: 1.45em;
+}
+.vw-message {
+  color: var(--danger);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.vw footer {
+  font-size: 0.875rem;
+}
+.vw-save {
+  background: var(--inset);
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: var(--space-3);
+}
+.vw-save input:not([type="checkbox"]) {
+  max-width: 100%;
+  min-height: var(--control);
+}
+.vw .vw-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}

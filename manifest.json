@@ -1,0 +1,37 @@
+{
+  "id": "viewers",
+  "title": "Viewers and editors",
+  "description": "Open photos, edit text and code, and read PDF and DjVu documents from Files.",
+  "version": "0.1.0",
+  "api": 1,
+  "core": ">=0.2.27,<0.3.0",
+  "architecture": "arm64",
+  "signer": "panasms-ci",
+  "service": "bin/server",
+  "memberAccess": true,
+  "dependencies": {
+    "files": ">=0.3.23,<0.4.0"
+  },
+  "packages": {
+    "libc6": "2.34",
+    "djvulibre-bin": "3.5",
+    "bubblewrap": "0.8",
+    "imagemagick": "6",
+    "util-linux": "2.38"
+  },
+  "license": "SUL-1.0",
+  "translations": {
+    "ru": {
+      "title": "Просмотрщики и редакторы",
+      "description": "Просмотр изображений, PDF и DjVu, редактирование текста и кода из модуля «Файлы»."
+    },
+    "uk": {
+      "title": "Переглядачі та редактори",
+      "description": "Перегляд зображень, PDF і DjVu, редагування тексту та коду з модуля «Файли»."
+    },
+    "en": {
+      "title": "Viewers and editors",
+      "description": "Open photos, edit text and code, and read PDF and DjVu documents from Files."
+    }
+  }
+}

@@ -1,2 +1,12 @@
-# module-viewers
-File viewers and editors for PaNasMs
+# PaNasMs Viewers and Editors
+
+Install **Viewers and editors** from the PaNasMs module catalog. It is an optional extension for Files 0.3.23 or later. Open a supported file in its folder; Back returns to the file list. Archives still open as folders. The module uses the signed-in user's Files access, including for archive members and linked storage.
+
+- **Gallery:** previous/next in folder sort order, arrow keys and touch swipe, pan, fit, actual size, zoom, quarter turns, monochrome and full screen. Changes initially affect only the view. **Save image** can replace a static JPEG, PNG or WebP after confirmation, create a new PNG beside the original, or download a PNG copy. Animated and converted files can only be exported as a single frame. Applying the displayed zoom to the output dimensions is optional. Raster exports omit metadata. JPEG, PNG/APNG, GIF, WebP, AVIF, SVG, BMP and icons use the browser decoder; JPEG XL requires browser support. TIFF, HEIC/HEIF, Photoshop, TGA, PCX, DDS, JPEG 2000 QOI and Netpbm use the installed ImageMagick delegates, previewing the first frame at up to 3200 pixels. Original downloads retain metadata, animation and resolution.
+- **Text and source:** CodeMirror with syntax highlighting, line numbers, folding, search/replace, undo/redo, wrapping and Ctrl/Cmd+S. Format JS/TS, JSON, JSONC, JSON5, YAML, CSS, HTML and Markdown on demand. Markdown and HTML have a visual editor for headings, emphasis and lists. Unsupported rich markup remains editable in source mode. Visual editing can normalize supported markup. UTF-8 files preserve BOM and uniform line endings; mixed endings are read-only. Source edits never execute the file.
+- **Documents:** PDF.js renders PDF locally with page navigation and zoom. DjVuLibre renders bundled or single-page DjVu in an isolated process. External DjVu page collections are not loaded.
+- **Saving:** version-checked Files publication; read-only locations, including RAR, stay read-only. A failed save retains edits and allows downloading an edited copy. The limit is 4 MiB for text, 48 MiB for images/DjVu and 96 MiB for PDF. No external conversion service or CDN is used.
+
+Build on Linux with Go, Node 24 and npm: `sh scripts/build.sh`. Run browser checks with `npx playwright install chromium && node tests/browser.mjs` after building. The production module declares its Debian runtime packages in its manifest. Native decoders run with a read-only input, a temporary filesystem, no home directory, no network and bounded resources.
+
+Original project: [PaNasMs](https://github.com/PaNasMs/panasms). See LICENSE and NOTICE; the package includes third-party notices.
