@@ -16,8 +16,8 @@ import {
   mdiContentSaveOutline,
 } from "@mdi/js";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { converts, ext, kind, natives, type Props } from "./types";
-import { decode } from "./io";
+import { kind, type Props } from "./types";
+import { imageBlob } from "./io";
 import { t } from "./strings";
 import { ImageSave } from "./save-image";
 let nextFocus: { path: string; strip: boolean } | undefined;
@@ -62,11 +62,9 @@ export function ImageView({
     U("");
     ready(false);
     if (!blob) return;
-    const x = ext(entry.name);
+
     (async () => {
-      const file = converts.has(x)
-        ? (await decode(blob, x, 1, c.signal)).blob
-        : blob.slice(0, blob.size, "image/" + natives[x]);
+      const file = await imageBlob(blob, entry.name, c.signal);
       if (!c.signal.aborted) {
         u = URL.createObjectURL(file);
         U(u);
@@ -83,7 +81,18 @@ export function ImageView({
     const el = frame.current!;
     const r = new ResizeObserver(() => B([el.clientWidth, el.clientHeight]));
     r.observe(el);
-    return () => r.disconnect();
+    const host = el.closest(".vw")?.parentElement;
+    return () => {
+      r.disconnect();
+      if (host && document.fullscreenElement === host)
+        requestAnimationFrame(() => {
+          if (
+            document.fullscreenElement === host &&
+            !host.querySelector(".vw-image-area")
+          )
+            void document.exitFullscreen().catch(() => {});
+        });
+    };
   }, []);
   const rotated = turn % 2 !== 0;
   const fit = Math.min(
@@ -114,6 +123,7 @@ export function ImageView({
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
+        group.length <= 1 ||
         savePanel ||
         (e.target instanceof Element &&
           !!e.target.closest("select, input, [role=dialog]")) ||
@@ -212,7 +222,7 @@ export function ImageView({
                       label: t("full"),
                       icon: mdiFullscreen,
                       run: () => {
-                        const el = frame.current?.closest("section");
+                        const el = frame.current?.closest(".vw")?.parentElement;
                         void (
                           document.fullscreenElement
                             ? document.exitFullscreen()
@@ -346,14 +356,17 @@ export function ImageView({
           </Button>
         )}
       </div>
-      <div inert={savePanel}>
-        <Filmstrip
-          group={group}
-          index={i}
-          choose={(file) => choose(file, true)}
-          restoreFocus={!!focus?.strip}
-        />
-      </div>
+      {group.length > 1 && (
+        <div inert={savePanel}>
+          <Filmstrip
+            group={group}
+            index={i}
+            choose={(file) => choose(file, true)}
+            restoreFocus={!!focus?.strip}
+            activeUrl={err ? "" : url}
+          />
+        </div>
+      )}
     </>
   );
 }

@@ -2,8 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@panasms/ui";
 import { mdiImageOutline } from "@mdi/js";
-import { read, decode } from "./io";
-import { ext, converts, natives, type Entry } from "./types";
+import { read, imageBlob } from "./io";
+import { ext, type Entry } from "./types";
 import { t } from "./strings";
 
 async function makeThumbnail(entry: Entry, signal: AbortSignal) {
@@ -23,9 +23,7 @@ async function makeThumbnail(entry: Entry, signal: AbortSignal) {
     blob = await response.blob();
   } else {
     const input = await read(entry, 48 * 1048576, signal);
-    blob = converts.has(format)
-      ? (await decode(input, format, 1, signal)).blob
-      : input.slice(0, input.size, "image/" + natives[format]);
+    blob = await imageBlob(input, entry.name, signal, true);
   }
   signal.throwIfAborted();
   const image = new Image();
@@ -50,14 +48,11 @@ async function makeThumbnail(entry: Entry, signal: AbortSignal) {
   }
 }
 
-// A viewport can show many RAW images. Share two decoding lanes across navigation.
-const lanes: Promise<void>[] = [Promise.resolve(), Promise.resolve()];
-let lane = 0;
+// Reserve the other native decoder slot for the photo being opened.
+let pending = Promise.resolve();
 function thumbnail(entry: Entry, signal: AbortSignal) {
-  const slot = lane;
-  lane = (lane + 1) % lanes.length;
-  const result = lanes[slot].then(() => makeThumbnail(entry, signal));
-  lanes[slot] = result.then(
+  const result = pending.then(() => makeThumbnail(entry, signal));
+  pending = result.then(
     () => {},
     () => {},
   );
@@ -65,7 +60,13 @@ function thumbnail(entry: Entry, signal: AbortSignal) {
 }
 function Preview({ entry }: { entry: Entry }) {
   const image = useQuery({
-    queryKey: ["viewers-filmstrip", entry.path, entry.revision, entry.size],
+    queryKey: [
+      "viewers-filmstrip",
+      entry.path,
+      entry.revision,
+      entry.modified,
+      entry.size,
+    ],
     queryFn: ({ signal }) => thumbnail(entry, signal),
     retry: false,
     staleTime: 60_000,
@@ -82,11 +83,13 @@ export function Filmstrip({
   index,
   choose,
   restoreFocus,
+  activeUrl,
 }: {
   group: Entry[];
   index: number;
   choose: (entry: Entry) => void;
   restoreFocus: boolean;
+  activeUrl: string;
 }) {
   const strip = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState<Set<number>>(() => new Set());
@@ -130,13 +133,17 @@ export function Filmstrip({
             data-index={n}
             aria-current={n === index ? "true" : undefined}
             aria-label={file.name}
-            title={file.name}
+            data-tooltip={file.name}
             tabIndex={n === index ? 0 : -1}
             onClick={() => {
               if (n !== index) choose(file);
             }}
           >
-            {visible.has(n) && <Preview entry={file} />}
+            {n === index && activeUrl ? (
+              <img src={activeUrl} alt="" draggable={false} />
+            ) : (
+              visible.has(n) && n !== index && <Preview entry={file} />
+            )}
           </button>
         ))}
       </div>

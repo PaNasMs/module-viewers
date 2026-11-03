@@ -220,11 +220,11 @@
   user-select: none;
   pointer-events: none;
 }
-.vw:fullscreen {
+:fullscreen > .vw {
   height: 100%;
   background: var(--panel-solid);
 }
-.vw:fullscreen .vw-stage {
+:fullscreen > .vw .vw-stage {
   flex: 1;
 }
 .vw-doc,
@@ -281,7 +281,7 @@
   position: relative;
   min-width: 0;
 }
-.vw-image-area .vw-stage {
+.vw-image-area:has(+ div .vw-filmstrip) .vw-stage {
   height: clamp(12rem, calc(72dvh - 4rem), 75rem);
   border-radius: 0;
 }
@@ -349,10 +349,17 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-.vw:fullscreen .vw-image-area {
+:fullscreen > .vw .vw-image-area {
   flex: 1;
   min-height: 0;
 }
-.vw:fullscreen .vw-image-area .vw-stage {
+:fullscreen > .vw .vw-image-area .vw-stage {
   height: 100%;
+}
+
+.vw-slides button:first-child {
+  margin-inline-start: auto;
+}
+.vw-slides button:last-child {
+  margin-inline-end: auto;
 }
