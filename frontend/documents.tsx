@@ -150,22 +150,26 @@ export default function Documents({
                 / {pages || "…"}
               </label>
             ),
-            commands: [
-              {
-                label: t("prev"),
-                icon: mdiChevronLeft,
-                disabled: page <= 1,
-                run: () => P(page - 1),
-              },
-              {
-                label: t("next"),
-                icon: mdiChevronRight,
-                disabled: page >= pages,
-                run: () => P(page + 1),
-              },
-            ],
+            commands:
+              pages > 1
+                ? [
+                    {
+                      label: t("prev"),
+                      icon: mdiChevronLeft,
+                      disabled: page <= 1,
+                      run: () => P(page - 1),
+                    },
+                    {
+                      label: t("next"),
+                      icon: mdiChevronRight,
+                      disabled: page >= pages,
+                      run: () => P(page + 1),
+                    },
+                  ]
+                : [],
           },
           {
+            primary: pages <= 1,
             between: <output>{Math.round(scale * 100)}%</output>,
             commands: [
               {

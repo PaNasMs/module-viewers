@@ -108,7 +108,11 @@ func render(w http.ResponseWriter, r *http.Request) {
 			e = errors.New("invalid DjVu")
 		}
 	} else {
-		data, e = run(ctx, f.Name(), "/usr/bin/convert", "-limit", "memory", "128MiB", "-limit", "map", "128MiB", "-limit", "disk", "32MiB", "-limit", "area", "32MP", coder+":/document[0]", "-auto-orient", "-thumbnail", "3200x3200>", "-strip", "png:-")
+		size := "3200x3200>"
+		if r.URL.Query().Get("thumbnail") == "1" {
+			size = "176x176>"
+		}
+		data, e = run(ctx, f.Name(), "/usr/bin/convert", "-limit", "memory", "128MiB", "-limit", "map", "128MiB", "-limit", "disk", "32MiB", "-limit", "area", "32MP", coder+":/document[0]", "-auto-orient", "-thumbnail", size, "-strip", "png:-")
 	}
 	if e != nil || !bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")) {
 		http.Error(w, "Cannot decode document", 422)

@@ -58,7 +58,15 @@ export default function Workspace(p: Props) {
           <span>{t("get")}</span>
         </a>
       </header>
-      {error ? (
+      {k === "image" ? (
+        <ImageView
+          {...p}
+          entry={entry}
+          blob={blob}
+          loadError={error}
+          retryLoad={() => R((x) => x + 1)}
+        />
+      ) : error ? (
         <p role="alert">
           {error} <button onClick={() => R((x) => x + 1)}>{t("retry")}</button>
         </p>
@@ -66,9 +74,7 @@ export default function Workspace(p: Props) {
         <p role="status">{t("loading")}</p>
       ) : (
         <Suspense fallback={<p role="status">{t("loading")}</p>}>
-          {k === "image" ? (
-            <ImageView {...p} entry={entry} blob={blob} />
-          ) : k === "text" ? (
+          {k === "text" ? (
             <Editor {...p} entry={entry} blob={blob} guard={guard} />
           ) : (
             <Documents blob={blob} kind={k} />

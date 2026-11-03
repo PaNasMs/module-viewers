@@ -1,5 +1,5 @@
 import { t } from "./strings";
-import type { Entry } from "./types";
+import { converts, ext, natives, type Entry } from "./types";
 export const content = (e: Entry) =>
   "/api/v1/files/content?" +
   new URLSearchParams({ target: "viewer:" + e.path });
@@ -22,15 +22,31 @@ export async function read(e: Entry, limit: number, signal: AbortSignal) {
   }
   return new Blob(chunks);
 }
+export async function imageBlob(
+  blob: Blob,
+  name: string,
+  signal: AbortSignal,
+  thumbnail = false,
+) {
+  const format = ext(name);
+  return converts.has(format)
+    ? (await decode(blob, format, 1, signal, thumbnail)).blob
+    : blob.slice(0, blob.size, "image/" + natives[format]);
+}
 export async function decode(
   blob: Blob,
   format: string,
   page: number,
   signal: AbortSignal,
+  thumbnail = false,
 ) {
   const r = await fetch(
     "/api/v1/module-api/viewers/render?" +
-      new URLSearchParams({ format, page: String(page) }),
+      new URLSearchParams({
+        format,
+        page: String(page),
+        ...(thumbnail ? { thumbnail: "1" } : {}),
+      }),
     {
       method: "POST",
       body: blob,

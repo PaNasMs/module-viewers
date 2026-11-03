@@ -1,3 +1,5 @@
+import { Filmstrip } from "./gallery";
+import { Icon, Button } from "@panasms/ui";
 import { Toolbar } from "./toolbar";
 import {
   mdiChevronLeft,
@@ -13,20 +15,30 @@ import {
   mdiFullscreen,
   mdiContentSaveOutline,
 } from "@mdi/js";
-import { useEffect, useRef, useState } from "react";
-import { converts, ext, kind, natives, type Props } from "./types";
-import { decode } from "./io";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { kind, type Props } from "./types";
+import { imageBlob } from "./io";
 import { t } from "./strings";
 import { ImageSave } from "./save-image";
+let nextFocus: { path: string; strip: boolean } | undefined;
+
 export function ImageView({
   blob,
+  loadError,
+  retryLoad,
   entry,
   siblings,
   open,
   readOnly,
   saved,
-}: Props & { blob: Blob }) {
-  const group = siblings.filter((e) => kind(e.name) === "image"),
+}: Props & { blob?: Blob; loadError: string; retryLoad: () => void }) {
+  const group = useMemo(
+      () =>
+        siblings.some((e) => e.path === entry.path)
+          ? siblings.filter((e) => kind(e.name) === "image")
+          : [entry],
+      [siblings, entry],
+    ),
     i = group.findIndex((e) => e.path === entry.path);
   const [savePanel, saveOpen] = useState(false);
   const frame = useRef<HTMLDivElement>(null),
@@ -49,11 +61,10 @@ export function ImageView({
     E("");
     U("");
     ready(false);
-    const x = ext(entry.name);
+    if (!blob) return;
+
     (async () => {
-      const file = converts.has(x)
-        ? (await decode(blob, x, 1, c.signal)).blob
-        : blob.slice(0, blob.size, "image/" + natives[x]);
+      const file = await imageBlob(blob, entry.name, c.signal);
       if (!c.signal.aborted) {
         u = URL.createObjectURL(file);
         U(u);
@@ -70,7 +81,18 @@ export function ImageView({
     const el = frame.current!;
     const r = new ResizeObserver(() => B([el.clientWidth, el.clientHeight]));
     r.observe(el);
-    return () => r.disconnect();
+    const host = el.closest(".vw")?.parentElement;
+    return () => {
+      r.disconnect();
+      if (host && document.fullscreenElement === host)
+        requestAnimationFrame(() => {
+          if (
+            document.fullscreenElement === host &&
+            !host.querySelector(".vw-image-area")
+          )
+            void document.exitFullscreen().catch(() => {});
+        });
+    };
   }, []);
   const rotated = turn % 2 !== 0;
   const fit = Math.min(
@@ -84,12 +106,24 @@ export function ImageView({
     Z(null);
     O([0, 0]);
   };
-  function step(n: number) {
-    if (group[i + n]) open(group[i + n]);
+  const [focus] = useState(() =>
+    nextFocus?.path === entry.path ? nextFocus : undefined,
+  );
+  useLayoutEffect(() => {
+    if (focus && !focus.strip) frame.current?.focus({ preventScroll: true });
+    if (nextFocus === focus) nextFocus = undefined;
+  }, [focus]);
+  function choose(file: Props["entry"], strip = false) {
+    nextFocus = { path: file.path, strip };
+    open(file);
+  }
+  function step(n: number, strip = false) {
+    if (i >= 0 && group[i + n]) choose(group[i + n], strip);
   }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
+        group.length <= 1 ||
         savePanel ||
         (e.target instanceof Element &&
           !!e.target.closest("select, input, [role=dialog]")) ||
@@ -102,7 +136,10 @@ export function ImageView({
         return;
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault();
-        step(e.key === "ArrowLeft" ? -1 : 1);
+        step(
+          e.key === "ArrowLeft" ? -1 : 1,
+          e.target instanceof Element && !!e.target.closest(".vw-filmstrip"),
+        );
       }
     };
     window.addEventListener("keydown", key);
@@ -114,27 +151,6 @@ export function ImageView({
         groups={[
           {
             primary: true,
-            between: (
-              <span className="vw-count">
-                {i + 1} / {group.length}
-              </span>
-            ),
-            commands: [
-              {
-                label: t("prev"),
-                icon: mdiChevronLeft,
-                disabled: i <= 0,
-                run: () => step(-1),
-              },
-              {
-                label: t("next"),
-                icon: mdiChevronRight,
-                disabled: i >= group.length - 1,
-                run: () => step(1),
-              },
-            ],
-          },
-          {
             between: <output>{Math.round(scale * 100)}%</output>,
             commands: [
               {
@@ -206,7 +222,7 @@ export function ImageView({
                       label: t("full"),
                       icon: mdiFullscreen,
                       run: () => {
-                        const el = frame.current?.closest("section");
+                        const el = frame.current?.closest(".vw")?.parentElement;
                         void (
                           document.fullscreenElement
                             ? document.exitFullscreen()
@@ -226,7 +242,7 @@ export function ImageView({
           },
         ]}
       />
-      {savePanel && frame.current?.querySelector("img") && (
+      {savePanel && blob && frame.current?.querySelector("img") && (
         <ImageSave
           entry={entry}
           readOnly={readOnly}
@@ -239,76 +255,118 @@ export function ImageView({
           cancel={() => saveOpen(false)}
         />
       )}
-      <div
-        inert={savePanel}
-        className="vw-stage"
-        ref={frame}
-        tabIndex={0}
-        aria-label={entry.name}
-        onDoubleClick={() => {
-          if (zoom === 1) reset();
-          else {
-            Z(1);
-            O([0, 0]);
-          }
-        }}
-        onPointerDown={(e) => {
-          if (e.button !== 0 || !url || err) return;
-          drag.current = {
-            x: e.clientX,
-            y: e.clientY,
-            dx: offset[0],
-            dy: offset[1],
-          };
-          e.currentTarget.setPointerCapture(e.pointerId);
-        }}
-        onPointerMove={(e) => {
-          const a = drag.current;
-          if (a) O([a.dx + e.clientX - a.x, a.dy + e.clientY - a.y]);
-        }}
-        onPointerUp={(e) => {
-          const a = drag.current;
-          drag.current = null;
-          if (
-            a &&
-            e.pointerType === "touch" &&
-            !zoom &&
-            Math.abs(e.clientX - a.x) > 70 &&
-            Math.abs(e.clientY - a.y) < 45
-          ) {
-            O([0, 0]);
-            step(e.clientX < a.x ? 1 : -1);
-          }
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
-      >
-        {err ? (
-          <p role="alert">
-            {err} <button onClick={() => R(retry + 1)}>{t("retry")}</button>
-          </p>
-        ) : url ? (
-          <img
-            src={url}
-            alt={entry.name}
-            draggable={false}
-            onLoad={(e) => {
-              S([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight]);
-              ready(true);
-            }}
-            onError={() => E(t("decode"))}
-            style={{
-              width: size[0],
-              height: size[1],
-              transform: `translate(calc(-50% + ${offset[0]}px),calc(-50% + ${offset[1]}px)) rotate(${turn * 90}deg) scale(${scale})`,
-              filter: mono ? "grayscale(1)" : undefined,
-            }}
-          />
-        ) : (
-          <p role="status">{t("loading")}</p>
+      <div className="vw-image-area" inert={savePanel}>
+        <div
+          inert={savePanel}
+          className="vw-stage"
+          ref={frame}
+          tabIndex={0}
+          aria-label={entry.name}
+          onDoubleClick={() => {
+            if (zoom === 1) reset();
+            else {
+              Z(1);
+              O([0, 0]);
+            }
+          }}
+          onPointerDown={(e) => {
+            if (e.button !== 0 || !url || err) return;
+            drag.current = {
+              x: e.clientX,
+              y: e.clientY,
+              dx: offset[0],
+              dy: offset[1],
+            };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            const a = drag.current;
+            if (a) O([a.dx + e.clientX - a.x, a.dy + e.clientY - a.y]);
+          }}
+          onPointerUp={(e) => {
+            const a = drag.current;
+            drag.current = null;
+            if (
+              a &&
+              e.pointerType === "touch" &&
+              !zoom &&
+              Math.abs(e.clientX - a.x) > 70 &&
+              Math.abs(e.clientY - a.y) < 45
+            ) {
+              O([0, 0]);
+              step(e.clientX < a.x ? 1 : -1);
+            }
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+          }}
+        >
+          {loadError ? (
+            <p role="alert">
+              {loadError} <button onClick={retryLoad}>{t("retry")}</button>
+            </p>
+          ) : err ? (
+            <p role="alert">
+              {err} <button onClick={() => R(retry + 1)}>{t("retry")}</button>
+            </p>
+          ) : url ? (
+            <img
+              src={url}
+              alt={entry.name}
+              draggable={false}
+              onLoad={(e) => {
+                S([
+                  e.currentTarget.naturalWidth,
+                  e.currentTarget.naturalHeight,
+                ]);
+                ready(true);
+              }}
+              onError={() => E(t("decode"))}
+              style={{
+                width: size[0],
+                height: size[1],
+                transform: `translate(calc(-50% + ${offset[0]}px),calc(-50% + ${offset[1]}px)) rotate(${turn * 90}deg) scale(${scale})`,
+                filter: mono ? "grayscale(1)" : undefined,
+              }}
+            />
+          ) : (
+            <p role="status">{t("loading")}</p>
+          )}
+        </div>
+        {i > 0 && (
+          <Button
+            type="button"
+            className="vw-edge vw-prev"
+            title={t("prev")}
+            aria-label={t("prev")}
+            onClick={() => step(-1)}
+          >
+            <Icon path={mdiChevronLeft} size={28} />
+          </Button>
+        )}
+        {i >= 0 && i + 1 < group.length && (
+          <Button
+            type="button"
+            className="vw-edge vw-next"
+            title={t("next")}
+            aria-label={t("next")}
+            onClick={() => step(1)}
+          >
+            <Icon path={mdiChevronRight} size={28} />
+          </Button>
         )}
       </div>
+      {group.length > 1 && (
+        <div inert={savePanel}>
+          <Filmstrip
+            group={group}
+            index={i}
+            choose={(file) => choose(file, true)}
+            restoreFocus={!!focus?.strip}
+            activeUrl={err ? "" : url}
+          />
+        </div>
+      )}
     </>
   );
 }
