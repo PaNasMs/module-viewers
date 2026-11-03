@@ -17,6 +17,7 @@ const Button = ({title,...props}) => jsx.jsx("button",{"data-tooltip":title,"ari
 const DialogContent = ({header,footer,children}) => jsx.jsxs(dialog.Content,{children:[header,children,footer]});
 const Notice = ({children,error}) => jsx.jsx("p",{role:error?"alert":"status",children});
 window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient,useQuery},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
+window.pendingThumbs=()=>client.isFetching();
 window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","single.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
 window.openFixture=name=>{const entry=window.files.find(e=>e.name===name);root.render(jsx.jsx(QueryClientProvider,{client,children:jsx.jsx(window.mod.fileViewer.component,{entry,siblings:window.files,readOnly:name==="read.txt",open:e=>window.openFixture(e.name),close:()=>root.render("closed"),saved:()=>root.render("saved")},entry.path)}))};`,
       resolveDir: process.cwd(),
@@ -71,6 +72,7 @@ function pdf(single = false) {
 }
 content["sample.pdf"] = pdf();
 content["single.pdf"] = pdf(true);
+let failedThumbReads = 0;
 let failSave = false,
   put = 0,
   lostReplies = 0,
@@ -100,8 +102,23 @@ const srv = createServer(async (req, res) => {
     if (url.pathname === "/api/v1/files/content") {
       const key = url.searchParams.get("target").replace("viewer:/", "");
       if (url.searchParams.get("thumbnail") === "1") {
-        res.setHeader("Content-Type", "image/png");
-        return res.end(content["c.png"]);
+        const target = url.searchParams.get("target");
+        if (target === "/missing-preview.png") {
+          failedThumbReads++;
+          res.statusCode = 404;
+          return res.end();
+        }
+        // Match the real Files thumbnail contract: raw local paths, not viewer-prefixed downloads.
+        if (/^\/album\/\d+\.png$/.test(target)) {
+          res.setHeader("Content-Type", "image/png");
+          return res.end(content["c.png"]);
+        }
+        assert.ok(["/a.webp", "/c.png"].includes(target), target);
+        res.setHeader(
+          "Content-Type",
+          target === "/c.png" ? "image/png" : "image/webp",
+        );
+        return res.end(content[target.slice(1)]);
       }
       if (req.method === "PUT" && key.startsWith("viewer-image:")) {
         assert.equal(url.searchParams.get("replace_revision"), "a".repeat(64));
@@ -294,6 +311,37 @@ try {
     await page.getByRole("button", { name: "Previous", exact: true }).count(),
     0,
   );
+  await page.setViewportSize({ width: 960, height: 720 });
+  await page.evaluate(() =>
+    window.files.push({
+      name: "missing-preview.png",
+      path: "/missing-preview.png",
+      size: 128,
+      revision: "b".repeat(64),
+    }),
+  );
+  const failed = page.waitForResponse(
+    (r) =>
+      r.url().includes("thumbnail=1") && r.url().includes("missing-preview"),
+  );
+  await open("a.webp");
+  await failed;
+  await page.waitForFunction(() => window.pendingThumbs() === 0);
+  await page.locator(".vw-next").click();
+  await page.getByRole("heading", { name: "b.svg" }).waitFor();
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(".vw-slides button img,.vw-slides button svg")
+        .length === 4 && window.pendingThumbs() === 0,
+  );
+  assert.equal(
+    failedThumbReads,
+    1,
+    "failed thumbnail retried when viewer remounted",
+  );
+  await page.evaluate(() => {
+    window.files = window.files.filter((e) => e.name !== "missing-preview.png");
+  });
   await page.evaluate(() => {
     window.files = window.files.filter((e) => e.name === "c.png");
   });
