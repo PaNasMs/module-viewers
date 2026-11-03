@@ -1,3 +1,5 @@
+import { Button, Icon } from "@panasms/ui";
+import { Filmstrip } from "./filmstrip";
 import { Toolbar } from "./toolbar";
 import {
   mdiChevronLeft,
@@ -13,21 +15,18 @@ import {
   mdiFullscreen,
   mdiContentSaveOutline,
 } from "@mdi/js";
-import { useEffect, useRef, useState } from "react";
-import { converts, ext, kind, natives, type Props } from "./types";
-import { decode } from "./io";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { kind, type Props } from "./types";
+import { imageBlob, read } from "./io";
 import { t } from "./strings";
 import { ImageSave } from "./save-image";
-export function ImageView({
-  blob,
-  entry,
-  siblings,
-  open,
-  readOnly,
-  saved,
-}: Props & { blob: Blob }) {
-  const group = siblings.filter((e) => kind(e.name) === "image"),
+export function ImageView({ entry, siblings, open, readOnly, saved }: Props) {
+  const group = useMemo(
+      () => siblings.filter((e) => kind(e.name) === "image"),
+      [siblings],
+    ),
     i = group.findIndex((e) => e.path === entry.path);
+  const [blob, setBlob] = useState<Blob>();
   const [savePanel, saveOpen] = useState(false);
   const frame = useRef<HTMLDivElement>(null),
     drag = useRef<{ x: number; y: number; dx: number; dy: number } | null>(
@@ -49,12 +48,11 @@ export function ImageView({
     E("");
     U("");
     ready(false);
-    const x = ext(entry.name);
     (async () => {
-      const file = converts.has(x)
-        ? (await decode(blob, x, 1, c.signal)).blob
-        : blob.slice(0, blob.size, "image/" + natives[x]);
+      const original = await read(entry, 48 * 1048576, c.signal);
+      const file = await imageBlob(original, entry.name, c.signal);
       if (!c.signal.aborted) {
+        setBlob(original);
         u = URL.createObjectURL(file);
         U(u);
       }
@@ -65,12 +63,25 @@ export function ImageView({
       c.abort();
       if (u) URL.revokeObjectURL(u);
     };
-  }, [blob, entry.name, retry]);
+  }, [entry, retry]);
   useEffect(() => {
     const el = frame.current!;
+    if (document.activeElement === document.body)
+      el.focus({ preventScroll: true });
+    const host = el.closest(".vw")?.parentElement;
     const r = new ResizeObserver(() => B([el.clientWidth, el.clientHeight]));
     r.observe(el);
-    return () => r.disconnect();
+    return () => {
+      r.disconnect();
+      if (host && document.fullscreenElement === host)
+        requestAnimationFrame(() => {
+          if (
+            document.fullscreenElement === host &&
+            !host.querySelector(".vw-photo")
+          )
+            void document.exitFullscreen().catch(() => {});
+        });
+    };
   }, []);
   const rotated = turn % 2 !== 0;
   const fit = Math.min(
@@ -90,6 +101,7 @@ export function ImageView({
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
+        group.length <= 1 ||
         savePanel ||
         (e.target instanceof Element &&
           !!e.target.closest("select, input, [role=dialog]")) ||
@@ -114,27 +126,6 @@ export function ImageView({
         groups={[
           {
             primary: true,
-            between: (
-              <span className="vw-count">
-                {i + 1} / {group.length}
-              </span>
-            ),
-            commands: [
-              {
-                label: t("prev"),
-                icon: mdiChevronLeft,
-                disabled: i <= 0,
-                run: () => step(-1),
-              },
-              {
-                label: t("next"),
-                icon: mdiChevronRight,
-                disabled: i >= group.length - 1,
-                run: () => step(1),
-              },
-            ],
-          },
-          {
             between: <output>{Math.round(scale * 100)}%</output>,
             commands: [
               {
@@ -147,6 +138,10 @@ export function ImageView({
                 icon: mdiMagnifyPlusOutline,
                 run: () => adjust(scale * 1.3),
               },
+            ],
+          },
+          {
+            commands: [
               {
                 label: t("fit"),
                 icon: mdiFitToScreenOutline,
@@ -206,7 +201,7 @@ export function ImageView({
                       label: t("full"),
                       icon: mdiFullscreen,
                       run: () => {
-                        const el = frame.current?.closest("section");
+                        const el = frame.current?.closest(".vw")?.parentElement;
                         void (
                           document.fullscreenElement
                             ? document.exitFullscreen()
@@ -226,7 +221,7 @@ export function ImageView({
           },
         ]}
       />
-      {savePanel && frame.current?.querySelector("img") && (
+      {savePanel && blob && frame.current?.querySelector("img") && (
         <ImageSave
           entry={entry}
           readOnly={readOnly}
@@ -239,76 +234,106 @@ export function ImageView({
           cancel={() => saveOpen(false)}
         />
       )}
-      <div
-        inert={savePanel}
-        className="vw-stage"
-        ref={frame}
-        tabIndex={0}
-        aria-label={entry.name}
-        onDoubleClick={() => {
-          if (zoom === 1) reset();
-          else {
-            Z(1);
-            O([0, 0]);
-          }
-        }}
-        onPointerDown={(e) => {
-          if (e.button !== 0 || !url || err) return;
-          drag.current = {
-            x: e.clientX,
-            y: e.clientY,
-            dx: offset[0],
-            dy: offset[1],
-          };
-          e.currentTarget.setPointerCapture(e.pointerId);
-        }}
-        onPointerMove={(e) => {
-          const a = drag.current;
-          if (a) O([a.dx + e.clientX - a.x, a.dy + e.clientY - a.y]);
-        }}
-        onPointerUp={(e) => {
-          const a = drag.current;
-          drag.current = null;
-          if (
-            a &&
-            e.pointerType === "touch" &&
-            !zoom &&
-            Math.abs(e.clientX - a.x) > 70 &&
-            Math.abs(e.clientY - a.y) < 45
-          ) {
-            O([0, 0]);
-            step(e.clientX < a.x ? 1 : -1);
-          }
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
-      >
-        {err ? (
-          <p role="alert">
-            {err} <button onClick={() => R(retry + 1)}>{t("retry")}</button>
-          </p>
-        ) : url ? (
-          <img
-            src={url}
-            alt={entry.name}
-            draggable={false}
-            onLoad={(e) => {
-              S([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight]);
-              ready(true);
-            }}
-            onError={() => E(t("decode"))}
-            style={{
-              width: size[0],
-              height: size[1],
-              transform: `translate(calc(-50% + ${offset[0]}px),calc(-50% + ${offset[1]}px)) rotate(${turn * 90}deg) scale(${scale})`,
-              filter: mono ? "grayscale(1)" : undefined,
-            }}
-          />
-        ) : (
-          <p role="status">{t("loading")}</p>
+      <div className="vw-photo" inert={savePanel}>
+        <div
+          className="vw-stage"
+          ref={frame}
+          tabIndex={0}
+          aria-label={entry.name}
+          onDoubleClick={() => {
+            if (zoom === 1) reset();
+            else {
+              Z(1);
+              O([0, 0]);
+            }
+          }}
+          onPointerDown={(e) => {
+            if (e.button !== 0 || !url || err) return;
+            drag.current = {
+              x: e.clientX,
+              y: e.clientY,
+              dx: offset[0],
+              dy: offset[1],
+            };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            const a = drag.current;
+            if (a) O([a.dx + e.clientX - a.x, a.dy + e.clientY - a.y]);
+          }}
+          onPointerUp={(e) => {
+            const a = drag.current;
+            drag.current = null;
+            if (
+              a &&
+              e.pointerType === "touch" &&
+              !zoom &&
+              Math.abs(e.clientX - a.x) > 70 &&
+              Math.abs(e.clientY - a.y) < 45
+            ) {
+              O([0, 0]);
+              step(e.clientX < a.x ? 1 : -1);
+            }
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+          }}
+        >
+          {err ? (
+            <p role="alert">
+              {err} <button onClick={() => R(retry + 1)}>{t("retry")}</button>
+            </p>
+          ) : url ? (
+            <img
+              src={url}
+              alt={entry.name}
+              draggable={false}
+              onLoad={(e) => {
+                S([
+                  e.currentTarget.naturalWidth,
+                  e.currentTarget.naturalHeight,
+                ]);
+                ready(true);
+              }}
+              onError={() => E(t("decode"))}
+              style={{
+                width: size[0],
+                height: size[1],
+                transform: `translate(calc(-50% + ${offset[0]}px),calc(-50% + ${offset[1]}px)) rotate(${turn * 90}deg) scale(${scale})`,
+                filter: mono ? "grayscale(1)" : undefined,
+              }}
+            />
+          ) : (
+            <p role="status">{t("loading")}</p>
+          )}
+        </div>
+        {[-1, 1].map(
+          (delta) =>
+            group[i + delta] &&
+            i >= 0 && (
+              <Button
+                type="button"
+                key={delta}
+                className={"vw-step " + (delta < 0 ? "previous" : "next")}
+                title={t(delta < 0 ? "prev" : "next")}
+                onClick={() => step(delta)}
+              >
+                <Icon
+                  path={delta < 0 ? mdiChevronLeft : mdiChevronRight}
+                  size={24}
+                />
+              </Button>
+            ),
         )}
       </div>
+      {i >= 0 && group.length > 1 && (
+        <Filmstrip
+          entries={group}
+          index={i}
+          open={open}
+          activeUrl={err ? "" : url}
+        />
+      )}
     </>
   );
 }

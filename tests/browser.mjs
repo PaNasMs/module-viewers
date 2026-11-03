@@ -10,14 +10,14 @@ const bootstrap = (
       contents: `
 import * as dialog from "@radix-ui/react-dialog";
 import * as react from "react";import * as jsx from "react/jsx-runtime";import {createRoot} from "react-dom/client";
-import {QueryClient,QueryClientProvider,useQueryClient} from "@tanstack/react-query";
+import {QueryClient,QueryClientProvider,useQueryClient,useQuery} from "@tanstack/react-query";
 const root=createRoot(document.getElementById("root")),client=new QueryClient(),dict={};
 const Icon = ({path,size}) => jsx.jsx("svg",{width:size,height:size,"aria-hidden":true,children:jsx.jsx("path",{d:path})});
 const Button = ({title,...props}) => jsx.jsx("button",{"data-tooltip":title,"aria-label":props["aria-label"] ?? title,...props});
 const DialogContent = ({header,footer,children}) => jsx.jsxs(dialog.Content,{children:[header,children,footer]});
 const Notice = ({children,error}) => jsx.jsx("p",{role:error?"alert":"status",children});
-window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
-window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
+window.PaNasMsSDK={react,jsx,dialog,ui:{Button,Icon,DialogContent,Notice},query:{useQueryClient,useQuery},runtime:{registerModule:m=>window.mod=m},i18n:{registerTranslations:(_,d)=>Object.assign(dict,d.en),translator:()=>k=>dict[k]||k,locale:()=>"en"}};
+window.files=["a.webp","b.svg","c.png","test.js","test.json","test.yaml","doc.md","doc.html","sample.pdf","single.pdf","sample.djvu","read.txt"].map(name=>({name,path:"/"+name,revision:"a".repeat(64),size:24}));
 window.openFixture=name=>{const entry=window.files.find(e=>e.name===name);root.render(jsx.jsx(QueryClientProvider,{client,children:jsx.jsx(window.mod.fileViewer.component,{entry,siblings:window.files,readOnly:name==="read.txt",open:e=>window.openFixture(e.name),close:()=>root.render("closed"),saved:()=>root.render("saved")},entry.path)}))};`,
       resolveDir: process.cwd(),
     },
@@ -42,12 +42,14 @@ const content = {
     "base64",
   ),
 };
-function pdf() {
+function pdf(single = false) {
   let s = "%PDF-1.4\n",
     offset = [0];
   for (const obj of [
     "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+    single
+      ? "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"
+      : "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] >>",
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] >>",
   ]) {
@@ -68,6 +70,7 @@ function pdf() {
   );
 }
 content["sample.pdf"] = pdf();
+content["single.pdf"] = pdf(true);
 let failSave = false,
   put = 0,
   lostReplies = 0,
@@ -96,6 +99,8 @@ const srv = createServer(async (req, res) => {
     }
     if (url.pathname === "/api/v1/files/content") {
       const key = url.searchParams.get("target").replace("viewer:/", "");
+      if (url.searchParams.has("thumbnail"))
+        return res.end(content[key.slice(1)]);
       if (req.method === "PUT" && key.startsWith("viewer-image:")) {
         assert.equal(url.searchParams.get("replace_revision"), "a".repeat(64));
         const chunks = [];
@@ -170,6 +175,26 @@ try {
   await page.locator(".vw-stage").focus();
   await page.keyboard.press("ArrowRight");
   await page.getByRole("heading", { name: "b.svg" }).waitFor();
+  const strip = page.getByRole("navigation", { name: "Photo thumbnails" });
+  assert.equal(await strip.getByRole("button").count(), 3);
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(".vw-thumbs img").length === 3 &&
+      [...document.querySelectorAll(".vw-thumbs img")].every(
+        (img) => img.naturalWidth > 0,
+      ),
+  );
+  await page.getByRole("button", { name: "Full screen" }).click();
+  await strip.getByRole("button", { name: "c.png" }).click();
+  await page.getByRole("heading", { name: "c.png" }).waitFor();
+  assert.ok(await page.evaluate(() => !!document.fullscreenElement));
+  assert.equal(
+    await page.getByRole("button", { name: "Next", exact: true }).count(),
+    0,
+  );
+  await page.getByRole("button", { name: "Previous", exact: true }).click();
+  await page.getByRole("heading", { name: "b.svg" }).waitFor();
+  await page.getByRole("button", { name: "Full screen" }).click();
   await open("c.png");
   await page.getByRole("button", { name: "Rotate right" }).click();
   await page.getByRole("button", { name: "Save image…" }).click();
@@ -252,6 +277,61 @@ try {
       await page.getByRole("dialog").waitFor({ state: "hidden" });
     }
   }
+  await open("single.pdf");
+  await page.waitForFunction(
+    () =>
+      document.querySelector(".vw-doc")?.getAttribute("aria-busy") === "false",
+  );
+  assert.equal(await page.getByRole("spinbutton").count(), 0);
+  assert.equal(
+    await page.getByRole("button", { name: "Previous", exact: true }).count(),
+    0,
+  );
+  await page.evaluate(() => {
+    window.files = window.files.filter((e) => e.name === "c.png");
+  });
+  await open("c.png");
+  await page.locator(".vw-stage img").waitFor();
+  assert.equal(await strip.count(), 0);
+  assert.equal(await page.locator(".vw-step").count(), 0);
+  await page.setViewportSize({ width: 390, height: 780 });
+  await page.evaluate(() => {
+    const fixture = window.files[0];
+    window.files = Array.from({ length: 80 }, (_, i) => ({
+      ...fixture,
+      path: "/album/" + i + ".png",
+      name: "album-" + i + ".png",
+    }));
+  });
+  await open("album-65.png");
+  await page.locator(".vw-stage [role=alert]").waitFor();
+  const bounds = await strip.evaluate((nav) => {
+    const track = nav.querySelector(".vw-thumbs"),
+      current = nav.querySelector("[aria-current]").getBoundingClientRect();
+    return {
+      left: track.getBoundingClientRect().left,
+      right: track.getBoundingClientRect().right,
+      start: current.left,
+      end: current.right,
+    };
+  });
+  assert.ok(
+    bounds.start >= bounds.left && bounds.end <= bounds.right,
+    "selected thumbnail visible after opening a deep link",
+  );
+  assert.ok(
+    await page.evaluate(
+      () =>
+        performance
+          .getEntriesByType("resource")
+          .filter(
+            (e) => e.name.includes("thumbnail=1") && e.name.includes("album"),
+          ).length < 20,
+    ),
+    "offscreen thumbnails stay lazy",
+  );
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("heading", { name: "album-66.png" }).waitFor();
   assert.equal(put, 6);
   assert.ok(lostReplies >= 1);
   console.log(

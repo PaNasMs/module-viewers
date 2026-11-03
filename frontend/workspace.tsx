@@ -15,14 +15,11 @@ export default function Workspace(p: Props) {
     [retry, R] = useState(0);
   const guard = useRef<null | (() => boolean)>(null);
   useEffect(() => {
+    if (k === "image") return;
     const c = new AbortController();
     E("");
     B(undefined);
-    read(
-      entry,
-      (k === "text" ? 4 : k === "djvu" || k === "image" ? 48 : 96) * 1048576,
-      c.signal,
-    )
+    read(entry, (k === "text" ? 4 : k === "djvu" ? 48 : 96) * 1048576, c.signal)
       .then((b) => {
         if (!c.signal.aborted) B(b);
       })
@@ -58,7 +55,9 @@ export default function Workspace(p: Props) {
           <span>{t("get")}</span>
         </a>
       </header>
-      {error ? (
+      {k === "image" ? (
+        <ImageView {...p} entry={entry} />
+      ) : error ? (
         <p role="alert">
           {error} <button onClick={() => R((x) => x + 1)}>{t("retry")}</button>
         </p>
@@ -66,9 +65,7 @@ export default function Workspace(p: Props) {
         <p role="status">{t("loading")}</p>
       ) : (
         <Suspense fallback={<p role="status">{t("loading")}</p>}>
-          {k === "image" ? (
-            <ImageView {...p} entry={entry} blob={blob} />
-          ) : k === "text" ? (
+          {k === "text" ? (
             <Editor {...p} entry={entry} blob={blob} guard={guard} />
           ) : (
             <Documents blob={blob} kind={k} />

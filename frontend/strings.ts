@@ -1,5 +1,6 @@
 import { registerTranslations, translator } from "@panasms/i18n";
 const words: Record<string, [string, string, string]> = {
+  filmstrip: ["Photo thumbnails", "Миниатюры фотографий", "Мініатюри фотографій"],
   tools: ["Tools", "Инструменты", "Інструменти"],
   destination: ["Save as", "Как сохранить", "Як зберегти"],
   folder: ["Folder", "В папку", "До теки"],

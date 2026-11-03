@@ -2,6 +2,7 @@ export type Entry = {
   name: string;
   path: string;
   size: number;
+  modified?: number;
   revision?: string;
 };
 export type Props = {

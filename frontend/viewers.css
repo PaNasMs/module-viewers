@@ -220,11 +220,11 @@
   user-select: none;
   pointer-events: none;
 }
-.vw:fullscreen {
+:fullscreen > .vw {
   height: 100%;
   background: var(--panel-solid);
 }
-.vw:fullscreen .vw-stage {
+:fullscreen > .vw .vw-stage {
   flex: 1;
 }
 .vw-doc,
@@ -275,4 +275,104 @@
 }
 .vw footer {
   font-size: 0.875rem;
+}
+
+.vw-photo {
+  position: relative;
+  min-height: 0;
+}
+.vw-photo:has(+ .vw-filmstrip) .vw-stage {
+  height: clamp(10rem, calc(72dvh - 4.5rem), 70rem);
+  border-radius: 0;
+}
+:fullscreen > .vw .vw-photo {
+  flex: 1;
+}
+:fullscreen > .vw .vw-photo .vw-stage {
+  height: 100%;
+}
+.vw .vw-step {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--control, 44px);
+  height: var(--control, 44px);
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-solid);
+  color: var(--ink);
+  border-radius: var(--radius-pill);
+}
+.vw .vw-step:active:not(:disabled) {
+  transform: translateY(-50%);
+}
+.vw-step.previous {
+  left: var(--space-3, 12px);
+}
+.vw-step.next {
+  right: var(--space-3, 12px);
+}
+.vw-filmstrip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-1, 4px) var(--space-3, 12px);
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.vw-thumbs {
+  display: flex;
+  gap: var(--space-2, 8px);
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding: var(--space-1, 4px);
+}
+.vw-thumbs button {
+  position: relative;
+  flex: 0 0 4.5rem;
+  height: 3.25rem;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  padding: 0;
+  background: var(--inset);
+  color: var(--mute);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.vw-thumbs button:first-child {
+  margin-inline-start: auto;
+}
+.vw-thumbs button:last-child {
+  margin-inline-end: auto;
+}
+.vw-thumbs button[aria-current] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.vw-thumbs button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.vw-thumbs img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--panel-solid);
+}
+.vw-thumb-fallback {
+  display: grid;
+  justify-items: center;
+  padding-inline: var(--space-1);
+}
+.vw-thumb-fallback span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
 }
