@@ -69,6 +69,7 @@ function Preview({ entry }: { entry: Entry }) {
     ],
     queryFn: ({ signal }) => thumbnail(entry, signal),
     retry: false,
+    retryOnMount: false,
     staleTime: 60_000,
     gcTime: 60_000,
   });
