@@ -147,6 +147,10 @@ const srv = createServer(async (req, res) => {
         assert.equal(url.searchParams.get("replace_revision"), "a".repeat(64));
         const data = [];
         for await (const chunk of req) data.push(chunk);
+        if (failSave) {
+          res.statusCode = 409;
+          return res.end();
+        }
         officeWrites.set(key, Buffer.concat(data));
         res.statusCode = 204;
         return res.end();
@@ -207,6 +211,21 @@ try {
   await page.keyboard.press("Home");
   await page.keyboard.type("Revised ");
   await page.getByRole("button", { name: "Heading", exact: true }).click();
+  await rich.locator("p").last().click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Bullet list", exact: true }).click();
+  await page.getByRole("button", { name: "Italic", exact: true }).click();
+  await page.keyboard.type("New item");
+  failSave = true;
+  await page.keyboard.press("Control+s");
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Save not confirmed" })
+    .waitFor();
+  assert.match(await rich.innerText(), /New item/);
+  assert.equal(officeWrites.size, 0);
+  failSave = false;
   await page.keyboard.press("Control+s");
   await page.getByText("saved", { exact: true }).waitFor();
   const output = async (name) => {
@@ -224,6 +243,14 @@ try {
   assert.match(await savedWord("word/document.xml"), /Revised/);
   assert.match(await savedWord("word/document.xml"), /884411/);
   assert.match(await savedWord("word/header1.xml"), /Test header/);
+  assert.match(await savedWord("word/document.xml"), /<w:i[\s/>]/);
+  assert.match(await savedWord("word/styles.xml"), /Heading2/);
+  assert.match(await savedWord("word/numbering.xml"), /bullet/);
+  assert.match(
+    await savedWord("word/_rels/document.xml.rels"),
+    /numbering.xml/,
+  );
+  assert.match(await savedWord("word/_rels/document.xml.rels"), /styles.xml/);
   await open("Sample.xlsx");
   await page.getByRole("textbox", { name: "A1", exact: true }).fill("35");
   assert.equal(

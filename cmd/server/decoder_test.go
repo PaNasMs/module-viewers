@@ -40,7 +40,21 @@ func TestOfficeConversion(t *testing.T) {
 		w := httptest.NewRecorder()
 		render(w, httptest.NewRequest("POST", "/render?format="+tc.format+"&page=1", bytes.NewReader(data)))
 		if w.Code != 200 || w.Header().Get("Content-Type") != "application/pdf" || !bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF-")) {
-			_, diagnostic := officePDF(context.Background(), base+"/"+tc.name, tc.format)
+			sample, err := os.CreateTemp("", "office-diagnostic-*")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(sample.Name())
+			if _, err = sample.Write(data); err != nil {
+				t.Fatal(err)
+			}
+			if err = sample.Chmod(0444); err != nil {
+				t.Fatal(err)
+			}
+			if err = sample.Close(); err != nil {
+				t.Fatal(err)
+			}
+			_, diagnostic := officePDF(context.Background(), sample.Name(), tc.format)
 			t.Fatalf("%s: %d %s (%v)", tc.name, w.Code, w.Body.String(), diagnostic)
 		}
 	}
