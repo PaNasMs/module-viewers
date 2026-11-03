@@ -124,6 +124,7 @@ const words: Record<string, [string, string, string]> = {
     "В документе есть разметка, которую визуальный редактор не сохранит. Используйте исходный текст.",
     "Документ містить розмітку, яку візуальний редактор не збереже. Редагуйте вихідний текст.",
   ],
+  pageStrip: ["Document pages", "Страницы документа", "Сторінки документа"],
   page: ["Page", "Страница", "Сторінка"],
   decode: [
     "This format could not be decoded. The original is available to download.",

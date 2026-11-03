@@ -1,3 +1,6 @@
+import { Button, Icon } from "@panasms/ui";
+import { Carousel } from "./gallery";
+import { PdfThumbnail } from "./pdf-thumbnail";
 import { Toolbar } from "./toolbar";
 import {
   mdiChevronLeft,
@@ -28,10 +31,16 @@ export default function Documents({
     [retry, R] = useState(0);
   const canvas = useRef<HTMLCanvasElement>(null),
     area = useRef<HTMLDivElement>(null);
-  const [width, W] = useState(800);
+  const album = kind === "pdf" && pages > 1;
+  const [width, W] = useState(800),
+    [height, H] = useState(600);
+  const gesture = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
     const a = area.current!;
-    const obs = new ResizeObserver(() => W(Math.max(200, a.clientWidth - 24)));
+    const obs = new ResizeObserver(() => {
+      W(Math.max(1, a.clientWidth - 24));
+      H(Math.max(1, a.clientHeight - 16));
+    });
     obs.observe(a);
     return () => obs.disconnect();
   }, []);
@@ -85,7 +94,10 @@ export default function Documents({
         const v = p.getViewport({ scale: 1 }),
           factor = Math.min(
             3,
-            (scale * width) / v.width,
+            scale *
+              (album
+                ? Math.min(width / v.width, height / v.height)
+                : width / v.width),
             3200 / Math.max(v.height, v.width),
           );
         const viewport = p.getViewport({ scale: factor });
@@ -120,38 +132,81 @@ export default function Documents({
     page,
     kind === "pdf" ? scale : 0,
     kind === "pdf" ? width : 0,
+    album ? height : 0,
+    album,
     retry,
   ]);
+  function showPage(n: number) {
+    if (n < 1 || n > pages || n === page) return;
+    area.current?.scrollTo(0, 0);
+    P(n);
+  }
+  const [stripFocus, setStripFocus] = useState(false);
+  useEffect(() => {
+    if (album && document.activeElement === document.body)
+      area.current?.focus({ preventScroll: true });
+  }, [album]);
+  const pageNumber = (
+    <label className="vw-count vw-page-number">
+      <input
+        key={page}
+        aria-label={t("page")}
+        type="number"
+        min={1}
+        max={pages || 1}
+        style={{
+          width: `calc(${Math.max(2, String(pages).length)}ch + 3rem)`,
+        }}
+        defaultValue={page}
+        onFocus={() => setStripFocus(false)}
+        onBlur={(e) => {
+          const n = +e.target.value;
+          if (Number.isInteger(n) && n >= 1 && n <= pages) showPage(n);
+          else e.target.value = String(page);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+            if (album) area.current?.focus({ preventScroll: true });
+          }
+        }}
+      />{" "}
+      / {pages || "…"}
+    </label>
+  );
+  function pageKey(event: React.KeyboardEvent<HTMLElement>) {
+    if (
+      !album ||
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      (event.target instanceof Element &&
+        event.target.closest("input, select, [role=toolbar]"))
+    )
+      return;
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    setStripFocus(
+      event.target instanceof Element && !!event.target.closest(".vw-slides"),
+    );
+    showPage(page + (event.key === "ArrowLeft" ? -1 : 1));
+  }
+  function step(n: number) {
+    setStripFocus(false);
+    area.current?.focus({ preventScroll: true });
+    showPage(n);
+  }
   return (
-    <>
+    <div className="vw-reader" onKeyDown={pageKey}>
       <Toolbar
         groups={[
           {
             primary: true,
-            between: (
-              <label className="vw-count">
-                {" "}
-                <input
-                  key={page}
-                  aria-label={t("page")}
-                  type="number"
-                  min={1}
-                  max={pages || 1}
-                  defaultValue={page}
-                  onBlur={(e) => {
-                    const n = +e.target.value;
-                    if (Number.isInteger(n) && n >= 1 && n <= pages) P(n);
-                    else e.target.value = String(page);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                />{" "}
-                / {pages || "…"}
-              </label>
-            ),
+            between: pageNumber,
             commands:
-              pages > 1
+              pages > 1 && !album
                 ? [
                     {
                       label: t("prev"),
@@ -169,7 +224,7 @@ export default function Documents({
                 : [],
           },
           {
-            primary: pages <= 1,
+            primary: pages <= 1 || album,
             between: <output>{Math.round(scale * 100)}%</output>,
             commands: [
               {
@@ -189,36 +244,103 @@ export default function Documents({
           },
         ]}
       />
-      <div className="vw-doc" ref={area} aria-busy={busy}>
-        {busy && <p role="status">{t("loading")}</p>}
-        {error && (
-          <p role="alert">
-            {error}{" "}
-            <button
-              onClick={() => {
-                E("");
-                B(true);
-                R(retry + 1);
-              }}
-            >
-              {t("retry")}
-            </button>
-          </p>
+      <div className={album ? "vw-page-area" : undefined}>
+        <div
+          className="vw-doc"
+          ref={area}
+          aria-busy={busy}
+          tabIndex={album ? 0 : undefined}
+          aria-label={album ? t("page") + " " + page : undefined}
+          onTouchStart={(e) => {
+            const touch = e.touches[0];
+            gesture.current =
+              album &&
+              e.touches.length === 1 &&
+              e.currentTarget.scrollWidth <= e.currentTarget.clientWidth
+                ? { x: touch.clientX, y: touch.clientY }
+                : null;
+          }}
+          onTouchCancel={() => {
+            gesture.current = null;
+          }}
+          onTouchEnd={(e) => {
+            const start = gesture.current;
+            gesture.current = null;
+            if (!start || e.touches.length) return;
+            const dx = e.changedTouches[0].clientX - start.x,
+              dy = e.changedTouches[0].clientY - start.y;
+            if (Math.abs(dx) > 70 && Math.abs(dy) < 45)
+              step(page + (dx < 0 ? 1 : -1));
+          }}
+        >
+          {busy && <p role="status">{t("loading")}</p>}
+          {error && (
+            <p role="alert">
+              {error}{" "}
+              <button
+                onClick={() => {
+                  E("");
+                  B(true);
+                  R(retry + 1);
+                }}
+              >
+                {t("retry")}
+              </button>
+            </p>
+          )}
+          {kind === "pdf" ? (
+            <canvas aria-label={t("page") + " " + page} ref={canvas} />
+          ) : (
+            image &&
+            !busy &&
+            !error && (
+              <img
+                alt={t("page") + " " + page}
+                src={image}
+                style={{ width: width * scale }}
+              />
+            )
+          )}
+        </div>
+        {album && page > 1 && (
+          <Button
+            className="vw-edge vw-prev"
+            title={t("prev")}
+            onClick={() => step(page - 1)}
+          >
+            <Icon path={mdiChevronLeft} size={28} />
+          </Button>
         )}
-        {kind === "pdf" ? (
-          <canvas aria-label={t("page") + " " + page} ref={canvas} />
-        ) : (
-          image &&
-          !busy &&
-          !error && (
-            <img
-              alt={t("page") + " " + page}
-              src={image}
-              style={{ width: width * scale }}
-            />
-          )
+        {album && page < pages && (
+          <Button
+            className="vw-edge vw-next"
+            title={t("next")}
+            onClick={() => step(page + 1)}
+          >
+            <Icon path={mdiChevronRight} size={28} />
+          </Button>
         )}
       </div>
-    </>
+      {album && pdf && (
+        <Carousel
+          count={pages}
+          index={page - 1}
+          label={t("pageStrip")}
+          counter={pageNumber}
+          name={(n) => t("page") + " " + (n + 1)}
+          restoreFocus={stripFocus}
+          choose={(n) => {
+            setStripFocus(true);
+            showPage(n + 1);
+          }}
+          preview={(n, visible) => (
+            <>
+              {visible && <PdfThumbnail pdf={pdf} page={n + 1} />}
+              <span className="vw-page-caption">{n + 1}</span>
+            </>
+          )}
+        />
+      )}
+    </div>
   );
 }
