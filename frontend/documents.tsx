@@ -38,10 +38,10 @@ export default function Documents({
   useEffect(() => {
     const a = area.current!;
     const obs = new ResizeObserver(() => {
-      W(Math.max(1, a.clientWidth - 24));
-      H(Math.max(1, a.clientHeight - 16));
+      W(Math.max(1, a.offsetWidth - 24));
+      H(Math.max(1, a.offsetHeight - a.clientTop - 16));
     });
-    obs.observe(a);
+    obs.observe(a, { box: "border-box" });
     return () => obs.disconnect();
   }, []);
   useEffect(() => {
@@ -244,7 +244,7 @@ export default function Documents({
           },
         ]}
       />
-      <div className={album ? "vw-page-area" : undefined}>
+      <div className={album ? "vw-doc-frame vw-page-area" : "vw-doc-frame"}>
         <div
           className="vw-doc"
           ref={area}
@@ -273,7 +273,6 @@ export default function Documents({
               step(page + (dx < 0 ? 1 : -1));
           }}
         >
-          {busy && <p role="status">{t("loading")}</p>}
           {error && (
             <p role="alert">
               {error}{" "}
@@ -302,6 +301,11 @@ export default function Documents({
             )
           )}
         </div>
+        {busy && (
+          <p className="vw-doc-loading" role="status">
+            {t("loading")}
+          </p>
+        )}
         {album && page > 1 && (
           <Button
             className="vw-edge vw-prev"
