@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 )
 
@@ -40,9 +41,12 @@ func officePDF(ctx context.Context, input, format string) ([]byte, error) {
 	var out limited
 	out.limit = 48 << 20
 	cmd := exec.CommandContext(ctx, "/usr/bin/prlimit", args...)
+	var diagnostics limited
+	diagnostics.limit = 4096
+	cmd.Stderr = &diagnostics
 	cmd.Stdout = &out
 	if err = cmd.Run(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("converter: %w (%s)", err, diagnostics.buf.String())
 	}
 	if !bytes.HasPrefix(out.buf.Bytes(), []byte("%PDF-")) {
 		return nil, errors.New("conversion failed")

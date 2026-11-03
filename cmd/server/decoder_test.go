@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -39,7 +40,8 @@ func TestOfficeConversion(t *testing.T) {
 		w := httptest.NewRecorder()
 		render(w, httptest.NewRequest("POST", "/render?format="+tc.format+"&page=1", bytes.NewReader(data)))
 		if w.Code != 200 || w.Header().Get("Content-Type") != "application/pdf" || !bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF-")) {
-			t.Fatalf("%s: %d %s", tc.name, w.Code, w.Body.String())
+			_, diagnostic := officePDF(context.Background(), base+"/"+tc.name, tc.format)
+			t.Fatalf("%s: %d %s (%v)", tc.name, w.Code, w.Body.String(), diagnostic)
 		}
 	}
 }
