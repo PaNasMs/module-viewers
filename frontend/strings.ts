@@ -1,5 +1,9 @@
 import { registerTranslations, translator } from "@panasms/i18n";
 const words: Record<string, [string, string, string]> = {
+  tools: ["Tools", "Инструменты", "Інструменти"],
+  destination: ["Save as", "Как сохранить", "Як зберегти"],
+  folder: ["Folder", "В папку", "До теки"],
+  get: ["Download", "Скачать", "Завантажити"],
   imageSave: ["Save image…", "Сохранить изображение…", "Зберегти зображення…"],
   replace: ["Replace original", "Заменить оригинал", "Замінити оригінал"],
   copy: [

@@ -1,3 +1,21 @@
+import * as Dialog from "@radix-ui/react-dialog";
+import { Button, DialogContent } from "@panasms/ui";
+import { Toolbar } from "./toolbar";
+import {
+  mdiContentSaveOutline,
+  mdiDownloadOutline,
+  mdiMagnify,
+  mdiWrap,
+  mdiFormatIndentIncrease,
+  mdiFileEditOutline,
+  mdiCodeTags,
+  mdiFormatBold,
+  mdiFormatItalic,
+  mdiFormatHeader2,
+  mdiFormatListBulleted,
+  mdiUndo,
+  mdiRedo,
+} from "@mdi/js";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
@@ -282,83 +300,163 @@ export default function Editor(
         !err && <p role="status">{t("loading")}</p>
       ) : (
         <>
-          <div className="vw-tools">
-            <button
-              disabled={locked || !dirty || busy}
-              onClick={() => void save()}
-            >
-              {t(busy ? "saving" : "save")}
-            </button>
-            {dirty && <button onClick={backup}>{t("export")}</button>}
-            {!visual && (
-              <>
-                <button
-                  onClick={() => cm.current && openSearchPanel(cm.current)}
-                >
-                  {t("find")}
-                </button>
-                <button aria-pressed={wrap} onClick={() => W(!wrap)}>
-                  {t("wrap")}
-                </button>
-              </>
-            )}
-            {!visual && parsers[x] && !locked && (
-              <button onClick={() => void format()}>{t("format")}</button>
-            )}
-            {richOK && !locked && (
-              <button
-                aria-pressed={visual}
-                onClick={() => {
-                  E("");
-                  G(!visual);
-                }}
-              >
-                {t(visual ? "source" : "visual")}
-              </button>
-            )}
-            {visual &&
-              (
-                ["bold", "italic", "heading", "list", "undo", "redo"] as const
-              ).map((key) => (
-                <button
-                  key={key}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    const chain = rich.current?.chain().focus();
-                    if (!chain) return;
-                    ({
-                      bold: () => chain.toggleBold(),
-                      italic: () => chain.toggleItalic(),
-                      heading: () => chain.toggleHeading({ level: 2 }),
-                      list: () => chain.toggleBulletList(),
-                      undo: () => chain.undo(),
-                      redo: () => chain.redo(),
-                    })
-                      [key]()
-                      .run();
-                  }}
-                >
-                  {t(key)}
-                </button>
-              ))}
-          </div>
+          <Toolbar
+            groups={[
+              {
+                primary: true,
+                commands: [
+                  {
+                    label: t(busy ? "saving" : "save"),
+                    icon: mdiContentSaveOutline,
+                    disabled: locked || !dirty || busy,
+                    run: () => void save(),
+                  },
+                  ...(dirty
+                    ? [
+                        {
+                          label: t("export"),
+                          icon: mdiDownloadOutline,
+                          run: backup,
+                        },
+                      ]
+                    : []),
+                ],
+              },
+              {
+                commands: visual
+                  ? []
+                  : [
+                      {
+                        label: t("find"),
+                        icon: mdiMagnify,
+                        run: () => {
+                          if (cm.current) openSearchPanel(cm.current);
+                        },
+                      },
+                      {
+                        label: t("wrap"),
+                        icon: mdiWrap,
+                        pressed: wrap,
+                        run: () => W(!wrap),
+                      },
+                      ...(parsers[x] && !locked
+                        ? [
+                            {
+                              label: t("format"),
+                              icon: mdiFormatIndentIncrease,
+                              run: () => void format(),
+                            },
+                          ]
+                        : []),
+                    ],
+              },
+              {
+                commands:
+                  richOK && !locked
+                    ? [
+                        {
+                          label: t(visual ? "source" : "visual"),
+                          icon: visual ? mdiCodeTags : mdiFileEditOutline,
+                          run: () => {
+                            E("");
+                            G(!visual);
+                          },
+                        },
+                      ]
+                    : [],
+              },
+              {
+                commands: visual
+                  ? (
+                      [
+                        [
+                          "bold",
+                          mdiFormatBold,
+                          () =>
+                            rich.current?.chain().focus().toggleBold().run(),
+                        ],
+                        [
+                          "italic",
+                          mdiFormatItalic,
+                          () =>
+                            rich.current?.chain().focus().toggleItalic().run(),
+                        ],
+                        [
+                          "heading",
+                          mdiFormatHeader2,
+                          () =>
+                            rich.current
+                              ?.chain()
+                              .focus()
+                              .toggleHeading({ level: 2 })
+                              .run(),
+                        ],
+                        [
+                          "list",
+                          mdiFormatListBulleted,
+                          () =>
+                            rich.current
+                              ?.chain()
+                              .focus()
+                              .toggleBulletList()
+                              .run(),
+                        ],
+                        [
+                          "undo",
+                          mdiUndo,
+                          () => rich.current?.chain().focus().undo().run(),
+                        ],
+                        [
+                          "redo",
+                          mdiRedo,
+                          () => rich.current?.chain().focus().redo().run(),
+                        ],
+                      ] as const
+                    ).map(([key, icon, run]) => ({ label: t(key), icon, run }))
+                  : [],
+              },
+            ]}
+          />
           {visual && <p>{t("loss")}</p>}
           {draft && <p>{t("draft")}</p>}
           {discard && (
-            <div className="vw-tools" role="alert">
-              <strong>{t("warning")}</strong>
-              <button autoFocus onClick={() => H(false)}>
-                {t("keep")}
-              </button>
-              <button
-                onClick={() => {
-                  draftMap.delete(entry.path);
-                  props.close();
-                }}
-              >
-                {t("discard")}
-              </button>
-            </div>
+            <Dialog.Root
+              open
+              onOpenChange={(open) => {
+                if (!open) H(false);
+              }}
+            >
+              <Dialog.Portal>
+                <Dialog.Overlay className="dialog-overlay" />
+                <DialogContent
+                  className="settings-dialog"
+                  variant="compact"
+                  intent="confirm"
+                  header={
+                    <>
+                      <Dialog.Title>{t("warning")}</Dialog.Title>
+                      <Dialog.Description>{name}</Dialog.Description>
+                    </>
+                  }
+                  footer={
+                    <div className="dialog-actions">
+                      <Button data-dialog-cancel onClick={() => H(false)}>
+                        {t("keep")}
+                      </Button>
+                      <Button
+                        className="danger"
+                        onClick={() => {
+                          draftMap.delete(entry.path);
+                          props.close();
+                        }}
+                      >
+                        {t("discard")}
+                      </Button>
+                    </div>
+                  }
+                />
+              </Dialog.Portal>
+            </Dialog.Root>
           )}
           <div
             inert={busy || discard}

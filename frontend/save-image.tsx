@@ -1,3 +1,5 @@
+import * as Dialog from "@radix-ui/react-dialog";
+import { Button, DialogContent, Notice } from "@panasms/ui";
 import { useEffect, useRef, useState } from "react";
 import { ext, type Props } from "./types";
 import { writeFile } from "./io";
@@ -55,6 +57,9 @@ export function ImageSave({
   saved: () => void | Promise<void>;
   cancel: () => void;
 }) {
+  const [mode, setMode] = useState<"replace" | "copy" | "download">(
+    readOnly ? "download" : "copy",
+  );
   const [resize, R] = useState(false),
     [error, E] = useState(""),
     [busy, B] = useState(false),
@@ -145,56 +150,87 @@ export function ImageSave({
     }
   }
   return (
-    <section className="vw-save" aria-label={t("imageSave")}>
-      <p>
-        {t("imageWarning")} {!replace && t("copyOnly")}
-      </p>
-      <div className="vw-tools">
-        <label>
-          <input
-            type="checkbox"
-            checked={resize}
-            disabled={busy}
-            onChange={(e) => R(e.target.checked)}
-          />{" "}
-          {t("resize")}
-        </label>
-        <output>
-          {t("pixels")}: {width} × {height}
-        </output>
-      </div>
-      <label>
-        {t("copyName")}{" "}
-        <input
-          value={name}
-          disabled={busy}
-          onChange={(e) => N(e.target.value)}
-        />
-      </label>
-      <div className="vw-tools">
-        <button autoFocus disabled={busy} onClick={cancel}>
-          {t("cancel")}
-        </button>
-        <button disabled={busy} onClick={() => void apply("download")}>
-          {t("downloadPNG")}
-        </button>
-        {!readOnly && (
-          <button disabled={busy} onClick={() => void apply("copy")}>
-            {t("copy")}
-          </button>
-        )}
-        {replace && (
-          <button
-            className="vw-danger"
-            disabled={busy}
-            onClick={() => void apply("replace")}
-          >
-            {t("replace")}
-          </button>
-        )}
-      </div>
-      {busy && <p role="status">{t("saving")}</p>}
-      {error && <p role="alert">{error}</p>}
-    </section>
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) cancel();
+      }}
+    >
+      <Dialog.Portal
+        container={document.fullscreenElement as HTMLElement | null}
+      >
+        <Dialog.Overlay className="dialog-overlay" />
+        <DialogContent
+          className="settings-dialog vw-save"
+          variant="form"
+          intent="edit"
+          dirty={false}
+          busy={busy}
+          message={t("saving")}
+          header={
+            <>
+              <Dialog.Title>{t("imageSave").replace(/…$/, "")}</Dialog.Title>
+              <Dialog.Description>{entry.name}</Dialog.Description>
+            </>
+          }
+          footer={
+            <div className="dialog-actions">
+              <Button data-dialog-cancel disabled={busy} onClick={cancel}>
+                {t("cancel")}
+              </Button>
+              <Button
+                className={mode === "replace" ? "danger" : "primary"}
+                disabled={busy}
+                onClick={() => void apply(mode)}
+              >
+                {t(
+                  mode === "replace"
+                    ? "replace"
+                    : mode === "copy"
+                      ? "save"
+                      : "get",
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <div className="vw-fields">
+            <label>
+              {t("destination")}
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as typeof mode)}
+              >
+                {!readOnly && <option value="copy">{t("copy")}</option>}
+                <option value="download">{t("downloadPNG")}</option>
+                {replace && <option value="replace">{t("replace")}</option>}
+              </select>
+            </label>
+            {mode !== "replace" && (
+              <label>
+                {t("copyName")}
+                <input value={name} onChange={(e) => N(e.target.value)} />
+              </label>
+            )}
+            <label className="vw-check">
+              <input
+                type="checkbox"
+                checked={resize}
+                onChange={(e) => R(e.target.checked)}
+              />
+              {t("resize")}
+            </label>
+            <output>
+              {t("pixels")}:{" "}
+              <strong>
+                {width} × {height}
+              </strong>
+            </output>
+            <p>{t("imageWarning")}</p>
+            {error && <Notice error>{error}</Notice>}
+          </div>
+        </DialogContent>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

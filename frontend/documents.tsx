@@ -1,3 +1,11 @@
+import { Toolbar } from "./toolbar";
+import {
+  mdiChevronLeft,
+  mdiChevronRight,
+  mdiMagnifyMinusOutline,
+  mdiMagnifyPlusOutline,
+  mdiFitToScreenOutline,
+} from "@mdi/js";
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { asset } from "./types";
@@ -116,50 +124,67 @@ export default function Documents({
   ]);
   return (
     <>
-      <div className="vw-tools">
-        <button disabled={page <= 1} onClick={() => P(page - 1)}>
-          ‹ {t("prev")}
-        </button>
-        <label>
-          {t("page")}{" "}
-          <input
-            key={page}
-            aria-label={t("page")}
-            type="number"
-            min={1}
-            max={pages || 1}
-            defaultValue={page}
-            onBlur={(e) => {
-              const n = +e.target.value;
-              if (Number.isInteger(n) && n >= 1 && n <= pages) P(n);
-              else e.target.value = String(page);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-          />{" "}
-          / {pages || "…"}
-        </label>
-        <button disabled={page >= pages} onClick={() => P(page + 1)}>
-          {t("next")} ›
-        </button>
-        <button
-          aria-label={t("zoomOut")}
-          title={t("zoomOut")}
-          onClick={() => Z(Math.max(0.25, scale - 0.25))}
-        >
-          −
-        </button>
-        <output>{Math.round(scale * 100)}%</output>
-        <button
-          aria-label={t("zoomIn")}
-          title={t("zoomIn")}
-          onClick={() => Z(Math.min(4, scale + 0.25))}
-        >
-          +
-        </button>
-        <button onClick={() => Z(1)}>{t("fit")}</button>
-      </div>
+      <Toolbar
+        groups={[
+          {
+            primary: true,
+            between: (
+              <label className="vw-count">
+                {" "}
+                <input
+                  key={page}
+                  aria-label={t("page")}
+                  type="number"
+                  min={1}
+                  max={pages || 1}
+                  defaultValue={page}
+                  onBlur={(e) => {
+                    const n = +e.target.value;
+                    if (Number.isInteger(n) && n >= 1 && n <= pages) P(n);
+                    else e.target.value = String(page);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                />{" "}
+                / {pages || "…"}
+              </label>
+            ),
+            commands: [
+              {
+                label: t("prev"),
+                icon: mdiChevronLeft,
+                disabled: page <= 1,
+                run: () => P(page - 1),
+              },
+              {
+                label: t("next"),
+                icon: mdiChevronRight,
+                disabled: page >= pages,
+                run: () => P(page + 1),
+              },
+            ],
+          },
+          {
+            between: <output>{Math.round(scale * 100)}%</output>,
+            commands: [
+              {
+                label: t("zoomOut"),
+                icon: mdiMagnifyMinusOutline,
+                disabled: scale <= 0.25,
+                run: () => Z(Math.max(0.25, scale - 0.25)),
+              },
+              {
+                label: t("zoomIn"),
+                icon: mdiMagnifyPlusOutline,
+                disabled: scale >= 4,
+                run: () => Z(Math.min(4, scale + 0.25)),
+              },
+              { label: t("fit"), icon: mdiFitToScreenOutline, run: () => Z(1) },
+            ],
+          },
+        ]}
+      />
       <div className="vw-doc" ref={area} aria-busy={busy}>
         {busy && <p role="status">{t("loading")}</p>}
         {error && (

@@ -10,6 +10,8 @@ const sdk = {
   "@tanstack/react-query": "query",
   "@panasms/runtime": "runtime",
   "@panasms/i18n": "i18n",
+  "@panasms/ui": "ui",
+  "@radix-ui/react-dialog": "dialog",
 };
 const shared = {
   name: "host-sdk",
@@ -17,7 +19,7 @@ const shared = {
     b.onResolve(
       {
         filter:
-          /^(?:react(?:\/jsx-runtime)?|@panasms\/(?:runtime|i18n)|@tanstack\/react-query)$/,
+          /^(?:react(?:\/jsx-runtime)?|@panasms\/(?:runtime|i18n|ui)|@radix-ui\/react-dialog|@tanstack\/react-query)$/,
       },
       (a) => ({ path: a.path, namespace: "sdk" }),
     );
