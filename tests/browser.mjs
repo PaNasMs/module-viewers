@@ -211,11 +211,15 @@ try {
   await page.keyboard.press("Home");
   await page.keyboard.type("Revised ");
   await page.getByRole("button", { name: "Heading", exact: true }).click();
-  await rich.locator("p").last().click();
-  await page.keyboard.press("End");
+  await rich.locator("h2").waitFor();
+  await rich.press("Control+End");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Bullet list", exact: true }).click();
   await page.getByRole("button", { name: "Italic", exact: true }).click();
+  await rich.locator("li").waitFor();
+  await page.waitForFunction(() =>
+    document.activeElement?.matches(".vw-word .tiptap"),
+  );
   await page.keyboard.type("New item");
   failSave = true;
   await page.keyboard.press("Control+s");

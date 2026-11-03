@@ -408,6 +408,7 @@ export default function Office(p: OfficeProps) {
       </>
     );
   const cmd = (label: string, icon: string, run: () => void) => ({
+    keepSelection: true,
     label: t(label),
     icon,
     run,
