@@ -57,6 +57,11 @@ export function ImageSave({
   saved: () => void | Promise<void>;
   cancel: () => void;
 }) {
+  const baseline = useRef({
+    mode: readOnly ? "download" : "copy",
+    name: entry.name.replace(/\.[^.]+$/, "") + " (1).png",
+    resize: false,
+  });
   const [mode, setMode] = useState<"replace" | "copy" | "download">(
     readOnly ? "download" : "copy",
   );
@@ -164,7 +169,11 @@ export function ImageSave({
           className="settings-dialog vw-save"
           variant="form"
           intent="edit"
-          dirty={false}
+          dirty={
+            mode !== baseline.current.mode ||
+            name !== baseline.current.name ||
+            resize !== baseline.current.resize
+          }
           busy={busy}
           message={t("saving")}
           header={

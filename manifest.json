@@ -2,7 +2,7 @@
   "id": "viewers",
   "title": "Viewers and editors",
   "description": "Browse photos, edit text, DOCX and XLSX, and read PDF, DjVu and PowerPoint slides from Files.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "api": 1,
   "core": ">=0.2.27,<0.3.0",
   "architecture": "arm64",
